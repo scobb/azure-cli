@@ -27,7 +27,7 @@ def patch_load_cached_subscriptions(unit_test):
         return [{
             "id": MOCKED_SUBSCRIPTION_ID,
             "user": {
-                "name": "example@example.com",
+                "name": "aml@aml.com",
                 "type": "user"
             },
             "state": "Enabled",

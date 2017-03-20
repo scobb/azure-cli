@@ -289,6 +289,7 @@ def get_command_table(module_name=None):
                 # Changing this error message requires updating CI script that checks for failed
                 # module loading.
                 logger.error("Error loading command module '%s'", mod)
+                logger.error('{}'.format(ex))
                 telemetry.set_exception(exception=ex, fault_type='module-load-error-' + mod,
                                         summary='Error loading module: {}'.format(mod))
                 logger.debug(traceback.format_exc())

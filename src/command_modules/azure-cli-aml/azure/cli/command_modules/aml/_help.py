@@ -3,10 +3,11 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-#pylint: disable=line-too-long
+from azure.cli.core.help_files import helps
 
-from azure.cli.core.commands import cli_command
+# pylint: disable=line-too-long
 
-
-cli_command(__name__, 'aml command1', 'azure.cli.command_modules.aml.custom#example_custom')
-cli_command(__name__, 'aml command2', 'azure.cli.command_modules.aml.custom#example_custom_two')
+helps['aml'] = """
+            type: group
+            short-summary: AzureML stuff
+            """
