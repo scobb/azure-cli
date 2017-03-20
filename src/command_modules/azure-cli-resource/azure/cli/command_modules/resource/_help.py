@@ -112,7 +112,7 @@ helps['resource list'] = """
 helps['resource show'] = """
     type: command
     short-summary: Get information about a resource.
-    long-summary: For example /subscriptions/0000/resourceGroups/MyResourceGroup/providers/Microsoft.Provider/ResA/MyA/ResB/MyB/resC/MyC.
+    long-summary: For aml /subscriptions/0000/resourceGroups/MyResourceGroup/providers/Microsoft.Provider/ResA/MyA/ResB/MyB/resC/MyC.
     examples:
         - name: Show a virtual machine.
           text: >
@@ -134,7 +134,7 @@ helps['resource show'] = """
 helps['resource delete'] = """
     type: command
     short-summary: Delete a resource. Reference the examples for help with arguments.
-    long-summary: For example, /subscriptions/0000/resourceGroups/MyResourceGroup/providers/Microsoft.Provider/ResA/MyA/ResB/MyB/ResC/MyC.
+    long-summary: For aml, /subscriptions/0000/resourceGroups/MyResourceGroup/providers/Microsoft.Provider/ResA/MyA/ResB/MyB/ResC/MyC.
     examples:
         - name: Delete a virtual machine.
           text: >
@@ -150,7 +150,7 @@ helps['resource delete'] = """
 helps['resource tag'] = """
     type: command
     short-summary: Tag a resource. Reference the examples for help with arguments.
-    long-summary: For example, /subscriptions/0000/resourceGroups/MyResourceGroup/providers/Microsoft.Provider/ResA/MyA/ResB/MyB/resC/MyC.
+    long-summary: For aml, /subscriptions/0000/resourceGroups/MyResourceGroup/providers/Microsoft.Provider/ResA/MyA/ResB/MyB/resC/MyC.
     examples:
         - name: Tag a virtual machine.
           text: >
