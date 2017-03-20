@@ -7,6 +7,5 @@
 
 from azure.cli.core.commands import cli_command
 
-
-cli_command(__name__, 'aml command1', 'azure.cli.command_modules.aml.custom#example_custom')
-cli_command(__name__, 'aml command2', 'azure.cli.command_modules.aml.custom#example_custom_two')
+cli_command(__name__, 'aml service batch list', 'azure.cli.command_modules.aml.service.batch#batch_service_list')
+cli_command(__name__, 'aml service batch view', 'azure.cli.command_modules.aml.service.batch#batch_service_view')
