@@ -22,6 +22,7 @@ from ._batchutilities import batch_list_jobs_header_to_fn_dict
 from ._batchutilities import BATCH_CANCEL_JOB_FMT
 from ._util import StaticStringResponse
 
+from ._batchutilities import batch_env_and_storage_are_valid
 
 def batch_service_list(context=cli_context):
     """
@@ -133,3 +134,37 @@ def batch_cancel_job(service_name, job_name, verb, context=cli_context):
         print(
         "Error connecting to {}. Please confirm SparkBatch app is healthy.".format(
             url))
+
+
+def batch_service_delete(service_name, verb, context=cli_context):
+    """
+    Processing for deleting a job on an existing batch service
+    :param context: CommandLineInterfaceContext object
+    :param args: list of str arguments
+    :return: None
+    """
+    if not batch_env_and_storage_are_valid(context):
+        return
+
+    url = batch_get_url(context, BATCH_SINGLE_WS_FMT, service_name)
+
+    try:
+        resp = context.http_call('get', url, auth=(context.hdi_user, context.hdi_pw))
+    except requests.ConnectionError:
+        print("Error connecting to {}. Please confirm SparkBatch app is healthy.".format(url))
+        return
+
+    exists, err_msg = get_success_and_resp_str(context, resp, verbose=verb)
+    if not exists:
+        print(err_msg)
+        return
+
+    if verb:
+        print('Deleting resource at {}'.format(url))
+    try:
+        resp = context.http_call('delete', url, auth=(context.hdi_user, context.hdi_pw))
+    except requests.ConnectionError:
+        print("Error connecting to {}. Please confirm SparkBatch app is healthy.".format(url))
+        return
+    print(get_success_and_resp_str(context, resp, response_obj=StaticStringResponse(
+        'Service {} deleted.'.format(service_name)), verbose=verb)[1])
