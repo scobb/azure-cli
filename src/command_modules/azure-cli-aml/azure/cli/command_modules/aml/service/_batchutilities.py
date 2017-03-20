@@ -39,7 +39,7 @@ BATCH_EXTENSION_TO_ASSET_DICT = {'.py': BATCH_PYTHON_ASSET,
 # EXCEPTION CLASSES
 class InvalidStorageException(Exception):
     """
-    Exception raised when determining valid storage fails
+    Exception raised when determining valid storage failsf
     """
 
 
@@ -280,87 +280,6 @@ def batch_get_job(context, job_name, service_name, verbose=False):
     except requests.ConnectionError:
         print("Error connecting to {}. Please confirm SparkBatch app is healthy.".format(url))
         return
-
-
-def print_batch_publish_usage():
-    """
-    prints usage statement for batch create
-    :return: None
-    """
-    print("aml service create batch "
-          "-n <service name> "
-          "-f <webservice file> "
-          "[-i <input>[=<default_value>] [-i <input>[=<default_value>]...]] "
-          "[-o <output>[=<default_value>] [-o <output>[=<default_value>] ...]] "
-          "[-p <parameter>[=<default_value>] [-p <parameter>[=<default_value>]...]] "
-          "[-d <dependency> [-d <dependency>...]] "
-          "[-v]")
-
-
-def print_batch_view_usage():
-    """
-    prints usage statement for batch view service
-    :return: None
-    """
-    print("aml service view batch "
-          "-n <service name> ")
-
-
-def print_batch_score_usage():
-    """
-    prints usage statement for batch run
-    :return: None
-    """
-    print("aml service run batch "
-          "-n <service name> "
-          "[-j <job id>] "
-          "[-i <input>=<value> [-i <input>=<value>...]] "
-          "[-o <output>=<value> [-o <output>=<value> ...]] "
-          "[-p <parameter>=<value> [-p <parameter>=<value>...]] "
-          "[-w] "
-          "[-v]")
-
-
-def print_batch_viewjob_usage():
-    """
-    prints usage statement for batch view job
-    :return: None
-    """
-    print('aml service viewjob batch '
-          "-n <service name> "
-          "-j <job id> "
-         )
-
-
-def print_batch_canceljob_usage():
-    """
-    prints usage statement for batch cancel job
-    :return: None
-    """
-    print('aml service canceljob batch '
-          "-n <service name> "
-          "-j <job id> "
-         )
-
-
-def print_batch_list_jobs_usage():
-    """
-    prints usage statement for batch list jobs
-    :return: None
-    """
-    print('aml service listjobs batch '
-          "-n <service name> "
-         )
-
-
-def print_batch_delete_usage():
-    """
-    prints usage statement for batch delete service
-    :return: None
-    """
-    print('aml service delete batch '
-          "-n <service name> "
-         )
 
 
 class BatchEnvironmentFunction(ValueFunction):
