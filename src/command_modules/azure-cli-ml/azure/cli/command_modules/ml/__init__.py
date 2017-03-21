@@ -3,11 +3,12 @@
 # Licensed under the MIT License. See License.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from azure.cli.core.help_files import helps
+import azure.cli.command_modules.ml._help #pylint: disable=unused-import
 
-# pylint: disable=line-too-long
 
-helps['aml'] = """
-            type: group
-            short-summary: AzureML stuff
-            """
+def load_params(_):
+    import azure.cli.command_modules.ml._params #pylint: disable=redefined-outer-name
+
+
+def load_commands():
+    import azure.cli.command_modules.ml.commands #pylint: disable=redefined-outer-name

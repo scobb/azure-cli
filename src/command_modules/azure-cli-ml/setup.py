@@ -32,7 +32,7 @@ with open('HISTORY.rst', 'r', encoding='utf-8') as f:
     HISTORY = f.read()
 
 setup(
-    name='azure-cli-aml',
+    name='azure-cli-ml',
     version=VERSION,
     description='Microsoft Azure Command-Line Tools AzureML Command Module',
     long_description=README + '\n\n' + HISTORY,
@@ -47,7 +47,7 @@ setup(
         'azure.cli.command_modules',
     ],
     packages=[
-        'azure.cli.command_modules.aml'
+        'azure.cli.command_modules.ml'
     ],
     install_requires=DEPENDENCIES,
 )
