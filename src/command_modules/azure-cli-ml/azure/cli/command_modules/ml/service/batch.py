@@ -24,6 +24,17 @@ from ._util import StaticStringResponse
 
 from ._batchutilities import batch_env_and_storage_are_valid
 
+import uuid
+from ._util import update_asset_path
+from pkg_resources import resource_string
+from ._util import get_json
+from ._batchutilities import batch_get_asset_type
+from ._batchutilities import batch_create_parameter_list
+import json
+from ._util import StaticStringWithTableReponse
+from ._batchutilities import batch_create_service_header_to_fn_dict
+
+
 def batch_service_list(context=cli_context):
     """
     Processing for listing existing batch services
@@ -168,3 +179,115 @@ def batch_service_delete(service_name, verb, context=cli_context):
         return
     print(get_success_and_resp_str(context, resp, response_obj=StaticStringResponse(
         'Service {} deleted.'.format(service_name)), verbose=verb)[1])
+
+
+def batch_service_create(driver_file, service_name, title, verb, inputs,
+                         outputs, parameters, dependencies,
+                         context=cli_context):
+    """
+    Processing for creating a new batch service
+    :param context: CommandLineInterfaceContext object
+    :param args: list of str arguments
+    :return: None
+    """
+
+    inputs = [] if inputs is None else inputs
+    outputs = [] if outputs is None else outputs
+    parameters = [] if parameters is None else parameters
+    dependencies = [] if dependencies is None else dependencies
+
+    if verb:
+        print('outputs: {0}'.format(outputs))
+        print('inputs: {0}'.format(inputs))
+        print('parameters: {0}'.format(parameters))
+
+    if not batch_env_and_storage_are_valid(context):
+        return
+
+    if not title:
+        title = service_name
+
+    # DEPENDENCIES
+    dependency_container = 'dependencies/{}'.format(uuid.uuid4())
+    try:
+        dependencies = [update_asset_path(context, verb, dependency, dependency_container) for dependency in dependencies]
+    except ValueError as exc:
+        print('Error uploading dependencies: {}'.format(exc))
+        return
+
+    # DRIVER
+    try:
+        driver_id, driver_uri = update_asset_path(context, verb, driver_file, dependency_container)
+    except ValueError as exc:
+        print('Error uploading driver: {}'.format(exc))
+        return
+
+    # modify json payload to update driver package location
+    payload = resource_string(__name__, 'data/batch_create_payload.json')
+    json_payload = get_json(payload)
+
+    json_payload['Assets'] = [{'Id': driver_id, 'Uri': driver_uri}]
+    json_payload['Package']['DriverProgramAsset'] = driver_id
+
+    # OTHER DEPENDENCIES
+    for dependency in dependencies:
+        json_payload['Assets'].append({'Id': dependency[0], 'Uri': dependency[1]})
+        json_payload['Package'][batch_get_asset_type(dependency[0])].append(
+            dependency[0])
+
+    # replace inputs from template
+    json_payload['Parameters'] = batch_create_parameter_list(inputs + outputs + parameters)
+
+    # update assets payload for default inputs
+    for parameter in json_payload['Parameters']:
+        if 'Value' in parameter:
+            if parameter['Kind'] == 'Reference':
+                try:
+                    asset_id, location = update_asset_path(context, verb, parameter['Value'],
+                                                           dependency_container,
+                                                           parameter['Direction'] ==
+                                                           'Input')
+                    json_payload['Assets'].append({'Id': asset_id, 'Uri': location})
+                    parameter['Value'] = asset_id
+                except ValueError as exc:
+                    print('Error creating parameter list: {}'.format(exc))
+                    return
+
+    # update title
+    json_payload['Title'] = title
+
+    if verb:
+        print('json_payload: {}'.format(json_payload))
+
+    return
+    # call SparkBatch with payload to create web service
+    url = batch_get_url(context, BATCH_SINGLE_WS_FMT, service_name)
+
+    if verb:
+        print("Creating web service at " + url)
+
+    headers = {'Content-Type': 'application/json'}
+
+    try:
+        resp = context.http_call('put', url, headers=headers,
+                            data=json.dumps(json_payload),
+                            auth=(context.hdi_user, context.hdi_pw))
+    except requests.ConnectionError:
+        print("Error connecting to {}. Please confirm SparkBatch app is healthy.".format(url))
+        return
+
+    # Create usage str: inputs/parameters before ouputs, optional after all
+    param_str = ' '.join([batch_get_parameter_str(p) for
+                          p in sorted(json_payload['Parameters'],
+                                      key=lambda x: '_' if 'Value' in x
+                                      else x['Direction'])])
+
+    usage = 'Usage: aml service run batch -n {} {} [-w] [-j <job_id>] [-v]'.format(service_name,
+                                                                                   param_str)
+
+    success, response = get_success_and_resp_str(context, resp, response_obj=StaticStringWithTableReponse(
+        usage, batch_create_service_header_to_fn_dict), verbose=verb)
+    if success:
+        print('Success.')
+
+    print(response)
