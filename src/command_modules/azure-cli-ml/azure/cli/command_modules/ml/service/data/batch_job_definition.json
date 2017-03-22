@@ -1,0 +1,8 @@
+{
+  "Parameters": {
+    "train-path": "https://azuremlbatchint.blob.core.windows.net/azureml/jobinputs/food_inspection_trainer/food_inspections1.csv",
+    "test-path": "https://azuremlbatchint.blob.core.windows.net/azureml/jobinputs/food_inspection_trainer/food_inspections2.csv",
+    "eval-results-path": "https://azuremlbatchint.blob.core.windows.net/azureml/joboutputs/food_inspection_trainer/eval_results.parquet",
+    "model-output-path": "https://azuremlbatchint.blob.core.windows.net/azureml/joboutputs/food_inspection_trainer/trained_model.model"
+  }
+}
