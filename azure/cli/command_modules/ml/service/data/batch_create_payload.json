@@ -1,0 +1,50 @@
+{
+  "Title": "Food Inspection Model trainer, from HDI Samples",
+  "Assets": [
+    {
+      "Id": "asset1",
+      "Uri": "wasbs://azureml@azuremlbatchint.blob.core.windows.net/jobinputs/food_inspection_trainer/driver.py"
+    }
+  ],
+  "Parameters": [
+    {
+      "Id": "--train-path",
+      "IsRuntime": true,
+      "IsOptional": false,
+      "Kind": "Reference",
+      "Direction": "Input"
+    },
+    {
+      "Id": "--test-path",
+      "IsRuntime": true,
+      "IsOptional": false,
+      "Kind": "Reference",
+      "Direction": "Input"
+    },
+    {
+      "Id": "--eval-results-path",
+      "IsRuntime": true,
+      "IsOptional": false,
+      "Kind": "Reference",
+      "Direction": "Output"
+    },
+    {
+      "Id": "--model-output-path",
+      "IsRuntime": true,
+      "IsOptional": false,
+      "Kind": "Reference",
+      "Direction": "Output"
+    }
+  ],
+  "PackageType": "Spark20",
+  "Package": {
+    "DriverProgramAsset": "asset1",
+    "JarAssets": [],
+    "PythonAssets": [],
+    "FileAssets": [],
+    "Configuration": {},
+    "Repositories": [],
+    "ArchiveAssets": [],
+    "Packages": []
+  }
+}

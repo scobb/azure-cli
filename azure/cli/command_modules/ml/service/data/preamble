@@ -1,0 +1,44 @@
+import os
+import sys
+os.environ["SPARK_HOME"] = "/opt/spark"
+os.environ["PYSPARK_SUBMIT_ARGS"]="pyspark-shell"
+spark_home = os.environ.get('SPARK_HOME', None)
+sys.path.insert(0, os.path.join(spark_home, 'python'))
+sys.path.insert(0, os.path.join(spark_home, 'python/lib/py4j-0.10.3-src.zip'))
+
+from pyspark import SparkContext
+from pyspark.sql import SparkSession
+from pyspark.sql.types import *
+
+spark = SparkSession.builder.getOrCreate()
+sc = spark.sparkContext
+
+#class azureml(object):
+#        schema2=StructType(
+#                [StructField("fields",
+#                             ArrayType(
+#                                     StructType(
+#                                             [
+#                                                     StructField("metadata",StructType(),True),
+#                                                     StructField("name",StringType(),True),
+#                                                     StructField("nullable",BooleanType(),True),
+#                                                     StructField("type",StringType(),True)
+#                                             ]
+#                                     ),True)
+#                             ,True),
+#                 StructField("type",StringType(),True)])
+#
+#        @staticmethod
+#        def saveSchema(df, filename):
+#                schemaString=[df.schema.json()]
+#                schemaRDD=sc.parallelize(schemaString)
+#                schemaDF=spark.read.json(schemaRDD,azureml.schema2)
+#                schemaDF.coalesce(1).write.format("json").mode("overwrite").save(filename)
+#                print("Schema saved to ",filename)
+#
+#        @staticmethod
+#        def loadSchema(filename):
+#                sDF=spark.read.json(filename, azureml.schema2)
+#                return StructType.fromJson(sDF.first().asDict(True))
+
+
