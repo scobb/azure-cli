@@ -191,15 +191,15 @@ def batch_service_create(driver_file, service_name, title, verb, inputs,
     :return: None
     """
 
-    inputs = [] if inputs is None else inputs
-    outputs = [] if outputs is None else outputs
-    parameters = [] if parameters is None else parameters
-    dependencies = [] if dependencies is None else dependencies
-
     if verb:
         print('outputs: {0}'.format(outputs))
         print('inputs: {0}'.format(inputs))
         print('parameters: {0}'.format(parameters))
+        print('driver_file: {}'.format(driver_file))
+
+    inputs = [(arg, 'Input', 'Reference') for arg in inputs]
+    outputs = [(arg, 'Output', 'Reference') for arg in outputs]
+    parameters = [(arg, 'Input', 'Value') for arg in parameters]
 
     if not batch_env_and_storage_are_valid(context):
         return
@@ -259,7 +259,6 @@ def batch_service_create(driver_file, service_name, title, verb, inputs,
     if verb:
         print('json_payload: {}'.format(json_payload))
 
-    return
     # call SparkBatch with payload to create web service
     url = batch_get_url(context, BATCH_SINGLE_WS_FMT, service_name)
 
