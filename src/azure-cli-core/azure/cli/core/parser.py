@@ -80,7 +80,7 @@ class AzCliCommandParser(argparse.ArgumentParser):
                                                       parents=self.parents, conflict_handler='error',
                                                       help_file=metadata.help
                                                       )
-                print('Choices: {}'.format(subparser.choices))
+                # print('Choices: {}'.format(subparser.choices))
             else:
                 command_parser = subparser.choices[command_verb]
 
@@ -120,7 +120,7 @@ class AzCliCommandParser(argparse.ArgumentParser):
         """For each part of the path, walk down the tree of
         subparsers, creating new ones if one doesn't already exist.
         """
-        print('Getting subparser for path {}'.format(path))
+        # print('Getting subparser for path {}'.format(path))
         for length in range(0, len(path)):
             parent_subparser = self.subparsers.get(tuple(path[0:length]), None)
             if not parent_subparser:
@@ -140,8 +140,8 @@ class AzCliCommandParser(argparse.ArgumentParser):
                 parent_subparser = new_parser.add_subparsers(dest='subcommand')
                 parent_subparser.required = True
                 self.subparsers[tuple(path[0:length])] = parent_subparser
-                print('Adding subparser!')
-        print('Returning {}'.format(parent_subparser))
+        #         print('Adding subparser!')
+        # print('Returning {}'.format(parent_subparser))
         return parent_subparser
 
     def _handle_command_package_error(self, err_msg):  # pylint: disable=no-self-use

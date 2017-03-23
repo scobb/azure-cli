@@ -105,6 +105,28 @@ class TestParser(unittest.TestCase):
         args = parser.parse_args('test command --opt sNake_CASE'.split())
         self.assertEqual(args.opt, 'snake_case')
 
+    def test_issue9253(self):
+        def test_handler(positional):
+            pass
+
+        def test_handler2():
+            pass
+
+        command = CliCommand('test command', test_handler)
+        command.add_argument('positional')
+        command2 = CliCommand('test command more', test_handler2)
+
+        cmd_table = {'test command': command,
+                     'test command more': command2}
+
+        parser = AzCliCommandParser()
+        parser.load_command_table(cmd_table)
+
+        args = parser.parse_args('test command stuff'.split())
+        self.assertIs(args.func, test_handler)
+        self.assertEqual(args.positional, 'stuff')
+
+
 
 class VerifyError(object):  # pylint: disable=too-few-public-methods
 
