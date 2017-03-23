@@ -75,6 +75,7 @@ class AzCliCommandParser(argparse.ArgumentParser):
 
             if command_verb not in subparser.choices:
                 subparser.choices[command_verb] = command_verb
+                print('adding subparser!')
                 command_parser = subparser.add_parser(command_verb,
                                                       description=metadata.description,
                                                       parents=self.parents, conflict_handler='error',
@@ -124,6 +125,7 @@ class AzCliCommandParser(argparse.ArgumentParser):
         for length in range(0, len(path)):
             parent_subparser = self.subparsers.get(tuple(path[0:length]), None)
             if not parent_subparser:
+                print("Constructing a new subparser...")
                 # No subparser exists for the given subpath - create and register
                 # a new subparser.
                 # Since we know that we always have a root subparser (we created)

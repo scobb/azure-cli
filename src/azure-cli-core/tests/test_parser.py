@@ -105,6 +105,18 @@ class TestParser(unittest.TestCase):
         args = parser.parse_args('test command --opt sNake_CASE'.split())
         self.assertEqual(args.opt, 'snake_case')
 
+    def test_positional(self):
+        def pos_handler(positional):
+            pass
+
+        command = CliCommand('test command', pos_handler)
+        command.add_argument('positional', '+')
+        cmd_table = {'test command': command}
+
+        parser = AzCliCommandParser()
+        parser.load_command_table(cmd_table)
+
+
     def test_issue9253(self):
         def test_handler(positional):
             pass
