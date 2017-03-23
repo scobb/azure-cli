@@ -4,6 +4,7 @@ import re as _re
 
 class AmlHelpFormatter(argparse.HelpFormatter):
     def _format_action_invocation(self, action):
+        print('Foramtting invocation...')
         if not action.option_strings:
             metavar, = self._metavar_formatter(action, action.dest)(1)
             return metavar
@@ -29,6 +30,7 @@ class AmlHelpFormatter(argparse.HelpFormatter):
 
     def _format_actions_usage(self, actions, groups):
         # find group indices and identify actions in groups
+        print('Foramtting usage...')
         group_actions = set()
         inserts = {}
         for group in groups:
