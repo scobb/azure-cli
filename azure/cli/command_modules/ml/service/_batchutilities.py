@@ -76,9 +76,9 @@ def batch_get_parameter_str(param_dict):
     :param param_dict: dictionary of Parameter descriptions
     :return: formatted string for Usage associated with this parameter
     """
-    letter = '-o' if param_dict['Direction'] == 'Output' else \
-        ('-i' if param_dict['Kind'] == 'Reference' else '-p')
-    ret_val = '{} {}=<value>'.format(letter, param_dict['Id'])
+    letter = '--out' if param_dict['Direction'] == 'Output' else \
+        ('--in' if param_dict['Kind'] == 'Reference' else '--param')
+    ret_val = '{}={}:<value>'.format(letter, param_dict['Id'])
     return '[{}]'.format(ret_val) if 'Value' in param_dict else ret_val
 
 
@@ -337,3 +337,16 @@ batch_view_service_usage_header_to_fn_dict = OrderedDict(
                                   param['Direction'] == 'Input'),
          action=lambda param: param['Id']))
     ])
+
+
+def validate_and_split_run_param(raw_param):
+    """
+
+    :param raw_param: str parameter in form <key>:<value>
+    :return: (bool, str, str) - (valid, key, value)
+    """
+    if ':' not in raw_param:
+        print("Must provide value for service parameter {0}".format(raw_param))
+        return False, None, None
+    else:
+        return True, raw_param.split(':')[0], ':'.join(raw_param.split(':')[1:])
