@@ -3,9 +3,9 @@ import json
 import requests
 import sys
 
-from azuremlcli.tests.mocks import TestContext
-from azuremlcli.tests.mocks import MockHttpResponse
-import azuremlcli.batchutilities as bu
+from .mocks import TestContext
+from .mocks import MockHttpResponse
+import azure.cli.command_modules.ml.service._batchutilities as bu
 
 
 class BatchUtilitiesTests(unittest.TestCase):
@@ -36,19 +36,19 @@ class BatchUtilitiesTests(unittest.TestCase):
 
     def test_batch_get_parameter_str(self):
         to_test = [({'Direction': 'Output', 'Id': '--myoutput', 'Kind': 'Reference'},
-                    '-o --myoutput=<value>'),
+                    '--out=--myoutput:<value>'),
                    (
                        {'Direction': 'Output', 'Id': '--mydefaultoutput',
                         'Kind': 'Reference',
-                        'Value': 'MyDefaultValue'}, '[-o --mydefaultoutput=<value>]'),
+                        'Value': 'MyDefaultValue'}, '[--out=--mydefaultoutput:<value>]'),
                    ({'Direction': 'Input', 'Id': '--myinput', 'Kind': 'Reference'},
-                    '-i --myinput=<value>'),
+                    '--in=--myinput:<value>'),
                    ({'Direction': 'Input', 'Id': '--mydefaultinput', 'Kind': 'Reference',
-                     'Value': 'MyDefaultValue'}, '[-i --mydefaultinput=<value>]'),
+                     'Value': 'MyDefaultValue'}, '[--in=--mydefaultinput:<value>]'),
                    ({'Direction': 'Input', 'Id': '--myparam', 'Kind': 'Value'},
-                    '-p --myparam=<value>'),
+                    '--param=--myparam:<value>'),
                    ({'Direction': 'Input', 'Id': '--mydefaultparam', 'Kind': 'Value',
-                     'Value': 'MyDefaultValue'}, '[-p --mydefaultparam=<value>]')]
+                     'Value': 'MyDefaultValue'}, '[--param=--mydefaultparam:<value>]')]
         for param_dict, expected_str in to_test:
             self.assertEqual(expected_str, bu.batch_get_parameter_str(param_dict))
 
@@ -85,7 +85,7 @@ class BatchUtilitiesTests(unittest.TestCase):
                     "Kind": kind,
                     "Direction": direction,
                     'Value': value}
-        actual = bu.batch_create_parameter_entry('{}={}'.format(name, value), kind,
+        actual = bu.batch_create_parameter_entry('{}:{}'.format(name, value), kind,
                                                  direction)
         self.assertEqual(actual, expected)
 
@@ -105,9 +105,9 @@ class BatchUtilitiesTests(unittest.TestCase):
         to_test = [('--myoutput', 'Output', 'Reference'),
                    ('--myinput', 'Input', 'Reference'),
                    ('--myparam', 'Input', 'Value'),
-                   ('--myoutputdefault=default_value', 'Output', 'Reference'),
-                   ('--myinputdefault=default_value', 'Input', 'Reference'),
-                   ('--myparamdefault=default_value', 'Input', 'Value')]
+                   ('--myoutputdefault:default_value', 'Output', 'Reference'),
+                   ('--myinputdefault:default_value', 'Input', 'Reference'),
+                   ('--myparamdefault:default_value', 'Input', 'Value')]
         actual = bu.batch_create_parameter_list(to_test)
         expected = [{'Kind': 'Reference', 'Direction': 'Output', 'Id': '--myoutput',
                      'IsOptional': False, 'IsRuntime': True},
