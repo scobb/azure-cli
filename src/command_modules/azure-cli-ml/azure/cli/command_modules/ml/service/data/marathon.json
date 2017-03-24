@@ -1,0 +1,46 @@
+{"container":
+    {"docker":
+        {
+          "portMappings":
+            [
+              {
+                "servicePort": 0,
+                "containerPort": 5001,
+                "hostport": 0
+              }
+            ],
+          "image": "",
+          "network": "BRIDGE",
+          "forcePullImage": true
+        },
+      "type": "DOCKER"
+    },
+  "healthChecks":
+    [
+      {
+        "protocol": "HTTP",
+        "path": "/",
+        "gracePeriodSeconds": 3,
+        "intervalSeconds": 10,
+        "portIndex": 0,
+        "timeoutSeconds": 10,
+        "maxConsecutiveFailures": 3
+      }
+    ],
+  "mem": 1024,
+  "labels":
+    {
+      "HAPROXY_0_VHOST": "rbacsagent.southcentralus.cloudapp.azure.com",
+      "HAPROXY_0_MODE": "http",
+      "HAPROXY_GROUP": "external",
+      "AMLBD_ORIGIN": "cli",
+      "AMLID": "magicdemo"
+    },
+  "cpus": 0.1,
+  "instances": 1,
+  "id": "magicdemo",
+  "uris":
+    [
+      "file:///opt/aml/docker.tar.gz"
+    ]
+}

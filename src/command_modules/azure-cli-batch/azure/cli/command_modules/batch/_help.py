@@ -234,7 +234,7 @@ helps['batch pool create'] = """
 
 helps['batch pool set'] = """
     type: command
-    short-summary: Update the properties of the specified pool. Properties can be updated independently, but when a property is updated in a sub-group, for example 'start task', all properties of that group are reset.
+    short-summary: Update the properties of the specified pool. Properties can be updated independently, but when a property is updated in a sub-group, for ml 'start task', all properties of that group are reset.
 """
 
 helps['batch pool reset'] = """
@@ -259,7 +259,7 @@ helps['batch job list'] = """
 
 helps['batch job set'] = """
     type: command
-    short-summary: Update the properties of a job. Properties can be updated independently, but when a property is updated in a sub-group, for example 'constraints' or 'pool info', all properties of that group are reset.
+    short-summary: Update the properties of a job. Properties can be updated independently, but when a property is updated in a sub-group, for ml 'constraints' or 'pool info', all properties of that group are reset.
 """
 
 helps['batch job reset'] = """
