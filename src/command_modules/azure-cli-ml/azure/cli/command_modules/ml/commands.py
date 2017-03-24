@@ -24,3 +24,9 @@ cli_command(__name__, 'ml env cluster', 'azure.cli.command_modules.ml.env#env_cl
 cli_command(__name__, 'ml env show', 'azure.cli.command_modules.ml.env#env_describe')
 cli_command(__name__, 'ml env local', 'azure.cli.command_modules.ml.env#env_local')
 cli_command(__name__, 'ml env setup', 'azure.cli.command_modules.ml.env#env_setup')
+
+# realtime commands
+cli_command(__name__, 'ml service create realtime', 'azure.cli.command_modules.ml.service.realtime#realtime_service_create')
+cli_command(__name__, 'ml service list realtime', 'azure.cli.command_modules.ml.service.realtime#realtime_service_list')
+cli_command(__name__, 'ml service view realtime', 'azure.cli.command_modules.ml.service.realtime#realtime_service_view')
+cli_command(__name__, 'ml service delete realtime', 'azure.cli.command_modules.ml.service.realtime#realtime_service_delete')
