@@ -1,38 +1,32 @@
 import requests
 import time
+import uuid
+import json
+from pkg_resources import resource_string
 from ._util import TableResponse
 from ._util import cli_context
+from ._util import StaticStringResponse
+from ._util import MultiTableResponse
+from ._util import update_asset_path
+from ._util import get_json
+from ._util import StaticStringWithTableReponse
 from ._batchutilities import batch_env_is_valid
 from ._batchutilities import batch_get_url
 from ._batchutilities import BATCH_ALL_WS_FMT
 from ._batchutilities import get_success_and_resp_str
 from ._batchutilities import batch_list_service_header_to_fn_dict
-
 from ._batchutilities import BATCH_SINGLE_WS_FMT
-from ._util import MultiTableResponse
 from ._batchutilities import batch_view_service_header_to_fn_dict
 from ._batchutilities import batch_view_service_usage_header_to_fn_dict
 from ._batchutilities import batch_get_parameter_str
-
 from ._batchutilities import batch_get_job
 from ._batchutilities import batch_get_job_description
-
 from ._batchutilities import BATCH_ALL_JOBS_FMT
 from ._batchutilities import batch_list_jobs_header_to_fn_dict
-
 from ._batchutilities import BATCH_CANCEL_JOB_FMT
-from ._util import StaticStringResponse
-
 from ._batchutilities import batch_env_and_storage_are_valid
-
-import uuid
-from ._util import update_asset_path
-from pkg_resources import resource_string
-from ._util import get_json
 from ._batchutilities import batch_get_asset_type
 from ._batchutilities import batch_create_parameter_list
-import json
-from ._util import StaticStringWithTableReponse
 from ._batchutilities import batch_create_service_header_to_fn_dict
 from ._batchutilities import BATCH_SINGLE_JOB_FMT
 from ._batchutilities import validate_and_split_run_param
@@ -61,7 +55,8 @@ def batch_service_view(service_name, verb, context=cli_context):
     """
     Processing for viewing an existing batch service
     :param context: CommandLineInterfaceContext object
-    :param args: list of str arguments
+    :param verb: bool flag to indicate verbosity
+    :param service_name: str name of service
     :return: None
     """
     if not batch_env_is_valid(context):
@@ -98,8 +93,9 @@ def batch_view_job(service_name, job_name, verb, context=cli_context):
     """
     Processing for viewing a job on an existing batch service
     :param context: CommandLineInterfaceContext object
-    :param context: CommandLineInterfaceContext object
-    :param args: list of str arguments
+    :param verb: bool flag to indicate verbosity
+    :param service_name: str name of service
+    :param job_name: str name of the job to view
     :return: None
     """
     if not batch_env_is_valid(context):
@@ -119,7 +115,7 @@ def batch_list_jobs(service_name, context=cli_context):
     """
     Processing for listing all jobs of an existing batch service
     :param context: CommandLineInterfaceContext object
-    :param args: list of str arguments
+    :param service_name: str name of service
     :return: None
     """
     if not batch_env_is_valid(context):
@@ -139,7 +135,9 @@ def batch_cancel_job(service_name, job_name, verb, context=cli_context):
     """
     Processing for canceling a job on an existing batch service
     :param context: CommandLineInterfaceContext object
-    :param args: list of str arguments
+    :param verb: bool flag to indicate verbosity
+    :param service_name: str name of service
+    :param job_name: str name of the job to cancel
     :return: None
     """
     if not batch_env_is_valid(context):
@@ -165,7 +163,8 @@ def batch_service_delete(service_name, verb, context=cli_context):
     """
     Processing for deleting a job on an existing batch service
     :param context: CommandLineInterfaceContext object
-    :param args: list of str arguments
+    :param verb: bool flag to indicate verbosity
+    :param service_name: str name of service
     :return: None
     """
     if not batch_env_and_storage_are_valid(context):
@@ -201,6 +200,19 @@ def batch_service_run(service_name, verb, inputs,
                       outputs, parameters, job_name,
                       wait_for_completion,
                       context=cli_context):
+    """
+
+    Processing for creating a new batch service
+    :param parameters: list of str of format <param_name>[:<default_value>]. value inputs.
+    :param outputs: list of str of format <param_name>[:<default_value>]. ref outputs.
+    :param inputs: list of str of format <param_name>[:<default_value>]. ref inputs.
+    :param verb: bool flag to indicate verbosity
+    :param service_name: str name of service
+    :param context: CommandLineInterfaceContext object
+    :param job_name: str name of job. defaults to time.strftime('%Y-%m-%d_%H%M%S')
+    :param wait_for_completion: bool flag to wait, defaults to False
+    :return: None
+    """
     if not job_name:
         job_name = time.strftime('%Y-%m-%d_%H%M%S')
 
@@ -302,8 +314,15 @@ def batch_service_create(driver_file, service_name, title, verb, inputs,
                          context=cli_context):
     """
     Processing for creating a new batch service
+    :param dependencies: list of str named dependencies
+    :param parameters: list of str of format <param_name>[:<default_value>]. value inputs.
+    :param outputs: list of str of format <param_name>[:<default_value>]. ref outputs.
+    :param inputs: list of str of format <param_name>[:<default_value>]. ref inputs.
+    :param verb: bool flag to indicate verbosity
+    :param title: str title of service, defaults to service_name
+    :param service_name: str name of service
+    :param driver_file: str path to driver file
     :param context: CommandLineInterfaceContext object
-    :param args: list of str arguments
     :return: None
     """
 
