@@ -245,8 +245,7 @@ def batch_service_run(service_name, verb, inputs,
                                                         parameter_dict[param_name][0],
                                                         parameters_container,
                                                         is_input=
-                                                        parameter_dict[param_name][
-                                                            1] == '-i')[1]
+                                                        parameter_dict[param_name][1])[1]
                           for param_name in parameter_dict}
     except ValueError as exc:
         print('Unable to process parameters: {}'.format(exc))
