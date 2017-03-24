@@ -4,11 +4,11 @@ import sys
 import os
 from mock import patch
 import datetime
-import azuremlcli.cli_util as cli_util
-from azuremlcli.tests.mocks import TestContext
-from azuremlcli.tests.mocks import CorruptConfigTestContext
-from azuremlcli.tests.mocks import MockResponse
-from azuremlcli.tests.mocks import MockHttpResponse
+import azure.cli.command_modules.ml.service._util as cli_util
+from .mocks import TestContext
+from .mocks import CorruptConfigTestContext
+from .mocks import MockResponse
+from .mocks import MockHttpResponse
 
 
 class CliUtilUnitTests(unittest.TestCase):
@@ -106,7 +106,7 @@ class CliUtilUnitTests(unittest.TestCase):
         output = sys.stdout.getvalue().strip()
         self.assertEquals(output, 'Warning: Error determining if there is a newer version of AzureML CLI available:')
 
-    @patch('azuremlcli.cli_util.check_version')
+    @patch('azure.cli.command_modules.ml.service._util.check_version')
     def test_first_run_no_version_check(self, check_version_mock):
         context = TestContext()
         context.set_cmd_result('pip list -o --pre', ('', ''))
@@ -123,7 +123,7 @@ class CliUtilUnitTests(unittest.TestCase):
         # should not update the config
         self.assertEqual(context.read_config(), config)
 
-    @patch('azuremlcli.cli_util.check_version')
+    @patch('azure.cli.command_modules.ml.service._util.check_version')
     def test_first_run_no_config_version_check(self, check_version_mock):
         context = TestContext()
         context.write_config({})
@@ -140,7 +140,7 @@ class CliUtilUnitTests(unittest.TestCase):
         self.assertEquals(context.read_config(),
                           {'mode': 'local'})
 
-    @patch('azuremlcli.cli_util.check_version')
+    @patch('azure.cli.command_modules.ml.service._util.check_version')
     def test_first_run_valid_config_version_check(self, check_version_mock):
         context = TestContext()
         context.write_config({'mode': 'cluster'})
@@ -157,7 +157,7 @@ class CliUtilUnitTests(unittest.TestCase):
         self.assertEquals(context.read_config(),
                           {'mode': 'cluster'})
 
-    @patch('azuremlcli.cli_util.check_version')
+    @patch('azure.cli.command_modules.ml.service._util.check_version')
     def test_first_run_corrupt_config_version_check(self, check_version_mock):
         context = CorruptConfigTestContext()
         cli_util.first_run(context)
@@ -173,7 +173,7 @@ class CliUtilUnitTests(unittest.TestCase):
         self.assertEquals(context.read_config(),
                           {'mode': 'local'})
 
-    @patch('azuremlcli.cli_util.check_version')
+    @patch('azure.cli.command_modules.ml.service._util.check_version')
     def test_first_run_corrupt_next_version_check(self, check_version_mock):
         context = TestContext()
         context.write_config({'next_version_check': 'some_trash_value'})
@@ -549,13 +549,6 @@ class CliUtilUnitTests(unittest.TestCase):
         fn.set_json(json_obj)
         to_check = fn.evaluate(context)
         self.assertEqual(to_check, 'print, print')
-
-    def test_version(self):
-        cli_util.version()
-        if not hasattr(sys.stdout, "getvalue"):
-            self.fail("need to run in buffered mode")
-        output = sys.stdout.getvalue().strip()
-        self.assertTrue(output.startswith('Azure Machine Learning Command Line Tools'))
 
     def test_is_int(self):
         self.assertTrue(cli_util.is_int('5'))
