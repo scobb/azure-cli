@@ -114,10 +114,10 @@ def batch_create_parameter_entry(name, kind, direction):
                     "IsOptional": False,
                     "Kind": kind,
                     "Direction": direction}
-    if '=' in name:
+    if ':' in name:
         # need default value
-        return_value['Id'] = name.split('=')[0]
-        return_value['Value'] = '='.join(name.split('=')[1:])
+        return_value['Id'] = name.split(':')[0]
+        return_value['Value'] = ':'.join(name.split(':')[1:])
 
     return return_value
 
