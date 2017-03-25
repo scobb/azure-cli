@@ -229,7 +229,7 @@ def env_cluster(force_connection, forwarded_port, verb, context=CommandLineInter
     env_describe(context)
 
 
-def env_describe(context):
+def env_describe(context=CommandLineInterfaceContext()):
     """Print current environment settings."""
     # TODO - update with app insights
     if context.in_local_mode():
