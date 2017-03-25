@@ -4,7 +4,7 @@ import sys
 import os
 from mock import patch
 import datetime
-import azure.cli.command_modules.ml.service._util as cli_util
+import azure.cli.command_modules.ml._util as cli_util
 from .mocks import TestContext
 from .mocks import CorruptConfigTestContext
 from .mocks import MockResponse
@@ -106,7 +106,7 @@ class CliUtilUnitTests(unittest.TestCase):
         output = sys.stdout.getvalue().strip()
         self.assertEquals(output, 'Warning: Error determining if there is a newer version of AzureML CLI available:')
 
-    @patch('azure.cli.command_modules.ml.service._util.check_version')
+    @patch('azure.cli.command_modules.ml._util.check_version')
     def test_first_run_no_version_check(self, check_version_mock):
         context = TestContext()
         context.set_cmd_result('pip list -o --pre', ('', ''))
@@ -123,7 +123,7 @@ class CliUtilUnitTests(unittest.TestCase):
         # should not update the config
         self.assertEqual(context.read_config(), config)
 
-    @patch('azure.cli.command_modules.ml.service._util.check_version')
+    @patch('azure.cli.command_modules.ml._util.check_version')
     def test_first_run_no_config_version_check(self, check_version_mock):
         context = TestContext()
         context.write_config({})
@@ -140,7 +140,7 @@ class CliUtilUnitTests(unittest.TestCase):
         self.assertEquals(context.read_config(),
                           {'mode': 'local'})
 
-    @patch('azure.cli.command_modules.ml.service._util.check_version')
+    @patch('azure.cli.command_modules.ml._util.check_version')
     def test_first_run_valid_config_version_check(self, check_version_mock):
         context = TestContext()
         context.write_config({'mode': 'cluster'})
@@ -157,7 +157,7 @@ class CliUtilUnitTests(unittest.TestCase):
         self.assertEquals(context.read_config(),
                           {'mode': 'cluster'})
 
-    @patch('azure.cli.command_modules.ml.service._util.check_version')
+    @patch('azure.cli.command_modules.ml._util.check_version')
     def test_first_run_corrupt_config_version_check(self, check_version_mock):
         context = CorruptConfigTestContext()
         cli_util.first_run(context)
@@ -173,7 +173,7 @@ class CliUtilUnitTests(unittest.TestCase):
         self.assertEquals(context.read_config(),
                           {'mode': 'local'})
 
-    @patch('azure.cli.command_modules.ml.service._util.check_version')
+    @patch('azure.cli.command_modules.ml._util.check_version')
     def test_first_run_corrupt_next_version_check(self, check_version_mock):
         context = TestContext()
         context.write_config({'next_version_check': 'some_trash_value'})

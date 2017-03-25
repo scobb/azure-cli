@@ -10,7 +10,7 @@ except ImportError:
     from urllib import pathname2url
     from urlparse import urljoin, urlparse
 
-import azure.cli.command_modules.ml.service._util as cli_util
+import azure.cli.command_modules.ml._util as cli_util
 
 
 class TestContext(cli_util.CommandLineInterfaceContext):

@@ -9,15 +9,17 @@ batch_cli_util.py - Defines utilities, constants for batch portion of azureml CL
 """
 
 from __future__ import print_function
+
 import os
 from collections import OrderedDict
-import requests
-from ._util import get_json
-from ._util import get_success_and_resp_str
-from ._util import ValueFunction
-from ._util import TraversalFunction
-from ._util import ConditionalListTraversalFunction
 
+import requests
+
+from .._util import ConditionalListTraversalFunction
+from .._util import TraversalFunction
+from .._util import ValueFunction
+from .._util import get_json
+from .._util import get_success_and_resp_str
 
 # CONSTANTS
 BATCH_URL_BASE_FMT = '{}'
