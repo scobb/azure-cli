@@ -23,3 +23,4 @@ cli_command(__name__, 'ml env about', 'azure.cli.command_modules.ml.env#env_abou
 cli_command(__name__, 'ml env cluster', 'azure.cli.command_modules.ml.env#env_cluster')
 cli_command(__name__, 'ml env show', 'azure.cli.command_modules.ml.env#env_describe')
 cli_command(__name__, 'ml env local', 'azure.cli.command_modules.ml.env#env_local')
+cli_command(__name__, 'ml env setup', 'azure.cli.command_modules.ml.env#env_setup')
