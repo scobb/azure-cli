@@ -22,3 +22,4 @@ cli_command(__name__, 'ml service canceljob batch', 'azure.cli.command_modules.m
 cli_command(__name__, 'ml env about', 'azure.cli.command_modules.ml.env#env_about')
 cli_command(__name__, 'ml env cluster', 'azure.cli.command_modules.ml.env#env_cluster')
 cli_command(__name__, 'ml env show', 'azure.cli.command_modules.ml.env#env_describe')
+cli_command(__name__, 'ml env local', 'azure.cli.command_modules.ml.env#env_local')
