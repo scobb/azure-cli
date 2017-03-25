@@ -4,7 +4,7 @@ import socket
 from ._util import CommandLineInterfaceContext
 from ._util import acs_connection_timeout
 from ._util import InvalidConfError
-from service._realtimeutilities import check_marathon_port_forwarding
+from .service._realtimeutilities import check_marathon_port_forwarding
 
 
 def acs_marathon_setup(context):
