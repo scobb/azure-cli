@@ -255,3 +255,29 @@ def env_describe(context=CommandLineInterfaceContext()):
             print('ACS Port forwarding    : ON, port {}'.format(forwarded_port))
         else:
             print('ACS Port forwarding    : OFF')
+
+
+def env_local(verb, context=CommandLineInterfaceContext()):
+
+    if not context.os_is_linux():
+        print('Local mode is not supported on this platform.')
+        return
+
+    try:
+        conf = context.read_config()
+        if not conf:
+            if verb:
+                print('[Debug] No configuration file found.')
+            conf = {}
+        elif 'mode' not in conf and verb:
+            print('[Debug] No mode setting found in config file. Suspicious.')
+        conf['mode'] = 'local'
+    except InvalidConfError:
+        if verb:
+            print('[Debug] Suspicious content in ~/.amlconf.')
+            print('[Debug] Resetting.')
+        conf = {'mode': 'local'}
+
+    context.write_config(conf)
+    env_describe(context)
+    return
