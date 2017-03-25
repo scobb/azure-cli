@@ -11,10 +11,12 @@ from azure.cli.core.commands.parameters import ignore_type
 # ignore the context--not for users
 register_cli_argument('', 'context', arg_type=ignore_type)
 
+# used throughout
+register_cli_argument('ml', 'verb', options_list='-v', required=False, help='Verbosity flag.', action='store_true')
+
 # batch workflows
 register_cli_argument('ml service', 'service_name', options_list='-n', help='Webservice name.')
 register_cli_argument('ml service', 'job_name', options_list='-j', help='Job name.')
-register_cli_argument('ml service', 'verb', options_list='-v', required=False, help='Verbosity flag.', action='store_true')
 register_cli_argument('ml service create batch', 'driver_file', options_list=('-f', '--driver-file'))
 register_cli_argument('ml service create batch', 'title', required=False)
 register_cli_argument('ml service run batch', 'job_name', required=False, options_list='-j', help='Job name. Defaults to a formatted timestamp (%Y-%m-%d_%H%M%S)')
@@ -32,3 +34,14 @@ register_cli_argument('ml service', 'parameters', options_list='--param', action
 register_cli_argument('ml service', 'dependencies', options_list='-d', action='append',
                       metavar='<dependency> [-d...]', default=[],
                         help='dependencies required for service', required=False)
+
+
+# env workflows
+register_cli_argument('ml env cluster', 'force_connection', options_list='-f', action='store_true',
+                       help='Force direct connection to ACS cluster.',
+                      required=False)
+register_cli_argument('ml env cluster', 'forwarded_port', options_list='-p', nargs='?',
+                      const=None, default=-1, type=int, required=False,
+                      help='Use port forwarding. If a port number is specified, test for an existing tunnel. Without a port number, try to set up an ssh tunnel through an unused port.' #pylint: disable=line-too-long
+                      )
+
