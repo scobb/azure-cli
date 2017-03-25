@@ -1,10 +1,26 @@
 import requests
 import subprocess
 import socket
+import os
+import platform
+from builtins import input
 from ._util import CommandLineInterfaceContext
 from ._util import acs_connection_timeout
 from ._util import InvalidConfError
 from .service._realtimeutilities import check_marathon_port_forwarding
+from ._az_util import az_check_template_deployment_status
+from ._az_util import AzureCliError
+from ._az_util import az_get_app_insights_account
+from ._az_util import az_parse_acs_outputs
+from ._az_util import validate_env_name
+from ._az_util import InvalidNameError
+from ._az_util import az_login
+from ._az_util import az_check_subscription
+from ._az_util import az_create_resource_group
+from ._az_util import az_create_storage_account
+from ._az_util import az_create_acr
+from ._az_util import az_create_app_insights_account
+from ._az_util import az_create_acs
 
 
 def acs_marathon_setup(context):
@@ -281,3 +297,189 @@ def env_local(verb, context=CommandLineInterfaceContext()):
     context.write_config(conf)
     env_describe(context)
     return
+
+
+def write_app_insights_to_amlenvrc(app_insights_account_name, app_insights_account_key, env_verb):
+    env_statements = ["{} AML_APP_INSIGHTS_NAME={}".format(env_verb, app_insights_account_name),
+                      "{} AML_APP_INSIGHTS_KEY={}".format(env_verb, app_insights_account_key)]
+
+    print('\n'.join([' {}'.format(statement) for statement in env_statements]))
+    try:
+        with open(os.path.expanduser('~/.amlenvrc'), 'a+') as env_file:
+            env_file.write('\n'.join(env_statements) + '\n')
+    except IOError:
+        pass
+
+    print('')
+
+
+def write_acs_to_amlenvrc(acs_master, acs_agent, env_verb):
+    env_statements = ["{} AML_ACS_MASTER={}".format(env_verb, acs_master),
+                      "{} AML_ACS_AGENT={}".format(env_verb, acs_agent)]
+
+    print('\n'.join([' {}'.format(statement) for statement in env_statements]))
+    try:
+        with open(os.path.expanduser('~/.amlenvrc'), 'a+') as env_file:
+            env_file.write('\n'.join(env_statements) + '\n')
+    except IOError:
+        pass
+
+    print('')
+
+
+def env_setup(status, name, context=CommandLineInterfaceContext()):
+    if status:
+        try:
+            completed_deployment = az_check_template_deployment_status(status)
+        except AzureCliError as exc:
+            print(exc.message)
+            return
+
+        if completed_deployment:
+            if 'appinsights' in completed_deployment['name']:
+                try:
+                    (app_insights_account_name, app_insights_account_key) = az_get_app_insights_account(completed_deployment)
+                    if app_insights_account_name and app_insights_account_key:
+                        print('App Insights account deployment succeeded.')
+                        print('App Insights account name     : {}'.format(app_insights_account_name))
+                        print('App Insights account key      : {}'.format(app_insights_account_key))
+                        print('To configure aml with this environment, '
+                            'set the following environment variables.')
+
+                        if platform.system() in ['Linux', 'linux', 'Unix', 'unix']:
+                            write_app_insights_to_amlenvrc(app_insights_account_name, app_insights_account_key, "export")
+                        else:
+                            write_app_insights_to_amlenvrc(app_insights_account_name, app_insights_account_key, "set")
+
+                except AzureCliError as exc:
+                    print(exc.message)
+                    return
+            else:
+                try:
+                    (acs_master, acs_agent) = az_parse_acs_outputs(completed_deployment)
+                    if acs_master and acs_agent:
+                        print('ACS deployment succeeded.')
+                        print('ACS Master URL     : {}'.format(acs_master))
+                        print('ACS Agent URL      : {}'.format(acs_agent))
+                        print('ACS admin username : acsadmin (Needed to set up port forwarding in cluster mode).')
+                        print('To configure aml with this environment, set the following environment variables.')
+                        if platform.system() in ['Linux', 'linux', 'Unix', 'unix']:
+                            write_acs_to_amlenvrc(acs_master, acs_agent, "export")
+                        else:
+                            write_acs_to_amlenvrc(acs_master, acs_agent, "set")
+
+                        print("To switch to cluster mode, run 'aml env cluster'.")
+                except AzureCliError as exc:
+                    print(exc.message)
+                    return
+
+        return
+    if not os.path.exists(os.path.expanduser('~/.ssh/id_rsa')):
+        print('Setting up ssh key pair')
+        try:
+            subprocess.check_call(['ssh-keygen', '-t', 'rsa', '-b', '2048', '-f', os.path.expanduser('~/.ssh/id_rsa')])
+        except subprocess.CalledProcessError:
+            print('Failed to set up sh key pair. Aborting environment setup.')
+
+    try:
+        with open(os.path.expanduser('~/.ssh/id_rsa.pub'), 'r') as sshkeyfile:
+            ssh_public_key = sshkeyfile.read().rstrip()
+    except IOError:
+        print('Could not load your SSH public key from {}'.format(os.path.expanduser('~/.ssh/id_rsa.pub')))
+        print('Please run aml env setup again to create a new ssh keypair.')
+        return
+    print('Setting up your Azure ML environment with a storage account, App Insights account, ACR registry and ACS cluster.')
+    if not name:
+        root_name = input('Enter environment name (1-20 characters, lowercase alphanumeric): ')
+        try:
+            validate_env_name(root_name)
+        except InvalidNameError as e:
+            print('Invalid environment name. {}'.format(e.message))
+            return
+    else:
+        root_name = name
+
+    try:
+        az_login()
+        if not name:
+            az_check_subscription()
+        resource_group = az_create_resource_group(context, root_name)
+        storage_account_name, storage_account_key = az_create_storage_account(context, root_name, resource_group)
+    except AzureCliError as exc:
+        print(exc.message)
+        return
+
+    if context.acr_home is not None and context.acr_user is not None and context.acr_pw is not None:
+        print('Found existing ACR setup:')
+        print('ACR Login Server: {}'.format(context.acr_home))
+        print('ACR Username    : {}'.format(context.acr_user))
+        print('ACR Password    : {}'.format(context.acr_pw))
+        answer = input('Setup a new ACR instead (y/N)?')
+        answer = answer.rstrip().lower()
+        if answer != 'y' and answer != 'yes':
+            print('Continuing with configured ACR.')
+            acr_login_server = context.acr_home
+            context.acr_username = context.acr_user
+            acr_password = context.acr_pw
+        else:
+            (acr_login_server, context.acr_username, acr_password) = \
+                az_create_acr(context, root_name, resource_group, storage_account_name)
+    else:
+        try:
+            (acr_login_server, context.acr_username, acr_password) = \
+                az_create_acr(context, root_name, resource_group, storage_account_name)
+        except AzureCliError as exc:
+            print(exc.message)
+            return
+
+    if context.app_insights_account_name and context.app_insights_account_key:
+        print("Found existing app insights account configured:")
+        print("App insights account name   : {}".format(context.app_insights_account_name))
+        print("App insights account key    : {}".format(context.app_insights_account_key))
+        answer = context.get_input('Setup a new app insights account instead (y/N)?')
+        answer = answer.rstrip().lower()
+        if answer != 'y' and answer != 'yes':
+            print('Continuing with configured app insights account.')
+        else:
+            az_create_app_insights_account(context, root_name, resource_group)
+
+    else:
+        az_create_app_insights_account(context, root_name, resource_group)
+
+    if context.acs_master_url and context.acs_agent_url:
+        print('Found existing ACS setup:')
+        print('ACS Master URL : {}'.format(context.acs_master_url))
+        print('ACR Agent URL  : {}'.format(context.acs_agent_url))
+        answer = input('Setup a new ACS instead (y/N)?')
+        answer = answer.rstrip().lower()
+        if answer != 'y' and answer != 'yes':
+            print('Continuing with configured ACS.')
+        else:
+            az_create_acs(root_name, resource_group, acr_login_server, context.acr_username, acr_password, ssh_public_key)
+    else:
+        try:
+            az_create_acs(root_name, resource_group, acr_login_server, context.acr_username, acr_password, ssh_public_key)
+        except AzureCliError as exc:
+            print(exc.message)
+
+    print('To configure aml for local use with this environment, set the following environment variables.')
+    if platform.system() in ['Linux', 'linux', 'Unix', 'unix']:
+        env_verb = 'export'
+    else:
+        env_verb = 'set'
+
+    env_statements = ["{} AML_STORAGE_ACCT_NAME='{}'".format(env_verb, storage_account_name),
+                      "{} AML_STORAGE_ACCT_KEY='{}'".format(env_verb, storage_account_key),
+                      "{} AML_ACR_HOME='{}'".format(env_verb, acr_login_server),
+                      "{} AML_ACR_USER='{}'".format(env_verb, context.acr_username),
+                      "{} AML_ACR_PW='{}'".format(env_verb, acr_password)]
+    print('\n'.join([' {}'.format(statement) for statement in env_statements]))
+
+    try:
+        with open(os.path.expanduser('~/.amlenvrc'), 'w+') as env_file:
+            env_file.write('\n'.join(env_statements) + '\n')
+        print('You can also find these settings saved in {}'.format(os.path.expanduser('~/.amlenvrc')))
+    except IOError:
+        pass
+
+    print('')
