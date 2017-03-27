@@ -9,8 +9,8 @@ from azure.cli.core.commands import cli_command
 from ._aml_help_formatter import AmlHelpFormatter
 
 # batch commands
-cli_command(__name__, 'ml service create batch', 'azure.cli.command_modules.ml.service.batch#batch_service_create')  # , formatter_class=AmlHelpFormatter)
-cli_command(__name__, 'ml service run batch', 'azure.cli.command_modules.ml.service.batch#batch_service_run')  # , formatter_class=AmlHelpFormatter)
+cli_command(__name__, 'ml service create batch', 'azure.cli.command_modules.ml.service.batch#batch_service_create', formatter_class=AmlHelpFormatter)
+cli_command(__name__, 'ml service run batch', 'azure.cli.command_modules.ml.service.batch#batch_service_run', formatter_class=AmlHelpFormatter)
 cli_command(__name__, 'ml service list batch', 'azure.cli.command_modules.ml.service.batch#batch_service_list')
 cli_command(__name__, 'ml service view batch', 'azure.cli.command_modules.ml.service.batch#batch_service_view')
 cli_command(__name__, 'ml service delete batch', 'azure.cli.command_modules.ml.service.batch#batch_service_delete')
