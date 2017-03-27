@@ -9,6 +9,7 @@ from azure.cli.command_modules.ml._az_util import az_login
 from azure.cli.command_modules.ml._az_util import az_check_subscription
 from azure.cli.command_modules.ml._az_util import az_create_resource_group
 from azure.cli.command_modules.ml._az_util import az_register_provider
+from azure.cli.command_modules.ml._az_util import az_create_storage_account
 from azure.cli.command_modules.ml._az_util import InvalidNameError
 from azure.cli.command_modules.ml._az_util import AzureCliError
 
@@ -221,6 +222,140 @@ class AzUtilTest(unittest.TestCase):
         check_call_mock.assert_called_once()
         self.assertEqual(check_output_mock.call_count, 2)
 
+    @patch('azure.cli.command_modules.ml._az_util.subprocess.check_output')
+    @patch('azure.cli.command_modules.ml._az_util.az_register_provider')
+    def test_az_create_storage_account_exc_already_taken_fail(self, register_provider_mock, check_output_mock):
+        check_output_mock.side_effect = [subprocess.CalledProcessError(1, '', 'already taken'), subprocess.CalledProcessError(1, '', 'something else.')]
+        try:
+            az_create_storage_account(TestContext(), 'root', 'rg')
+            self.fail('Expected exception to be raised.')
+        except AzureCliError:
+            pass
+        self.assertEqual(register_provider_mock.call_count, 2)
+        self.assertEqual(check_output_mock.call_count, 2)
+
+    @patch('azure.cli.command_modules.ml._az_util.subprocess.check_output')
+    @patch('azure.cli.command_modules.ml._az_util.az_register_provider')
+    def test_az_create_storage_account_json_exc(self, register_provider_mock, check_output_mock):
+        check_output_mock.return_value = 'malformed{json'
+        try:
+            az_create_storage_account(TestContext(), 'root', 'rg')
+            self.fail('Expected exception to be raised.')
+        except AzureCliError:
+            pass
+        self.assertEqual(register_provider_mock.call_count, 1)
+        self.assertEqual(check_output_mock.call_count, 1)
+
+    @patch('azure.cli.command_modules.ml._az_util.subprocess.check_output')
+    @patch('azure.cli.command_modules.ml._az_util.az_register_provider')
+    def test_az_create_storage_account_empty_json_dict(self, register_provider_mock, check_output_mock):
+        check_output_mock.return_value = '{}'
+        try:
+            az_create_storage_account(TestContext(), 'root', 'rg')
+            self.fail('Expected exception to be raised.')
+        except AzureCliError:
+            pass
+        self.assertEqual(register_provider_mock.call_count, 1)
+        self.assertEqual(check_output_mock.call_count, 1)
+
+    @patch('azure.cli.command_modules.ml._az_util.subprocess.check_output')
+    @patch('azure.cli.command_modules.ml._az_util.az_register_provider')
+    def test_az_create_storage_account_storage_key_fails(self, register_provider_mock, check_output_mock):
+        check_output_mock.side_effect = [json.dumps({'provisioningState': 'Succeeded'}),
+                                         subprocess.CalledProcessError(1, '', 'some output')]
+
+        try:
+            az_create_storage_account(TestContext(), 'root', 'rg')
+            self.fail('Expected exception to be raised.')
+        except AzureCliError:
+            pass
+        self.assertEqual(register_provider_mock.call_count, 1)
+        self.assertEqual(check_output_mock.call_count, 2)
+
+    @patch('azure.cli.command_modules.ml._az_util.subprocess.check_output')
+    @patch('azure.cli.command_modules.ml._az_util.az_register_provider')
+    def test_az_create_storage_account_storage_key_malformed_json(self, register_provider_mock, check_output_mock):
+        check_output_mock.side_effect = [json.dumps({'provisioningState': 'Succeeded'}),
+                                         'malformed{json']
+
+        try:
+            az_create_storage_account(TestContext(), 'root', 'rg')
+            self.fail('Expected exception to be raised.')
+        except AzureCliError:
+            pass
+        self.assertEqual(register_provider_mock.call_count, 1)
+        self.assertEqual(check_output_mock.call_count, 2)
+
+    @patch('azure.cli.command_modules.ml._az_util.subprocess.check_output')
+    @patch('azure.cli.command_modules.ml._az_util.az_register_provider')
+    def test_az_create_storage_account_storage_key_no_key(self, register_provider_mock, check_output_mock):
+        check_output_mock.side_effect = [json.dumps({'provisioningState': 'Succeeded'}),
+                                         json.dumps({'thing1': 'one',
+                                                     'thing2': 'two'})]
+
+        try:
+            az_create_storage_account(TestContext(), 'root', 'rg')
+            self.fail('Expected exception to be raised.')
+        except AzureCliError:
+            pass
+        self.assertEqual(register_provider_mock.call_count, 1)
+        self.assertEqual(check_output_mock.call_count, 2)
+
+    @patch('azure.cli.command_modules.ml._az_util.subprocess.check_output')
+    @patch('azure.cli.command_modules.ml._az_util.az_register_provider')
+    def test_az_create_storage_account_storage_key_no_key(self, register_provider_mock, check_output_mock):
+        check_output_mock.side_effect = [json.dumps({'provisioningState': 'Succeeded'}),
+                                         json.dumps({'thing1': 'one',
+                                                     'thing2': 'two'})]
+
+        try:
+            az_create_storage_account(TestContext(), 'root', 'rg')
+            self.fail('Expected exception to be raised.')
+        except AzureCliError:
+            pass
+        self.assertEqual(register_provider_mock.call_count, 1)
+        self.assertEqual(check_output_mock.call_count, 2)
+
+    @patch('azure.cli.command_modules.ml._az_util.subprocess.check_output')
+    @patch('azure.cli.command_modules.ml._az_util.az_register_provider')
+    def test_az_create_storage_account_storage_key_one_key(self, register_provider_mock, check_output_mock):
+        check_output_mock.side_effect = [json.dumps({'provisioningState': 'Succeeded'}),
+                                         json.dumps({'keys': [{}]})]
+
+        try:
+            az_create_storage_account(TestContext(), 'root', 'rg')
+            self.fail('Expected exception to be raised.')
+        except AzureCliError:
+            pass
+        self.assertEqual(register_provider_mock.call_count, 1)
+        self.assertEqual(check_output_mock.call_count, 2)
+
+    @patch('azure.cli.command_modules.ml._az_util.subprocess.check_output')
+    @patch('azure.cli.command_modules.ml._az_util.az_register_provider')
+    def test_az_create_storage_account_storage_key_no_key_name(self, register_provider_mock, check_output_mock):
+        check_output_mock.side_effect = [json.dumps({'provisioningState': 'Succeeded'}),
+                                         json.dumps({'keys': [{}, {}]})]
+
+        try:
+            az_create_storage_account(TestContext(), 'root', 'rg')
+            self.fail('Expected exception to be raised.')
+        except AzureCliError:
+            pass
+        self.assertEqual(register_provider_mock.call_count, 1)
+        self.assertEqual(check_output_mock.call_count, 2)
+
+    @patch('azure.cli.command_modules.ml._az_util.subprocess.check_output')
+    @patch('azure.cli.command_modules.ml._az_util.az_register_provider')
+    def test_az_create_storage_account_storage_key_happy(self, register_provider_mock, check_output_mock):
+        check_output_mock.side_effect = [json.dumps({'provisioningState': 'Succeeded'}),
+                                         json.dumps({'keys': [{}, {'keyName': 'primary',
+                                                                   'value': 'test_value'}]})]
+
+        storage_name, key_value = az_create_storage_account(TestContext(), 'root', 'rg')
+        self.assertEqual(storage_name, 'rootstor')
+        self.assertEqual(key_value, 'test_value')
+        self.assertEqual(register_provider_mock.call_count, 1)
+        self.assertEqual(check_output_mock.call_count, 2)
 
 
 
