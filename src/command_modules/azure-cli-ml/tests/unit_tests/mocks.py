@@ -123,3 +123,22 @@ class MockResponse(cli_util.Response):
         :return: str response to print to user
         """
         return json.dumps(json_obj)
+
+
+class MockSocket(object):
+    def __init__(self, port):
+        self.tup_list = None
+        self.port = port
+
+    def bind(self, tup_list):
+        self.tup_list = tup_list
+
+    def getsockname(self):
+        """
+
+        :return: (str, int): (address, port)
+        """
+        return '0.0.0.0', self.port
+
+    def close(self):
+        pass
