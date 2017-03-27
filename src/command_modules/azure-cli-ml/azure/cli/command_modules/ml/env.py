@@ -368,7 +368,7 @@ def env_setup(status, name, context=CommandLineInterfaceContext()):
                         else:
                             write_acs_to_amlenvrc(acs_master, acs_agent, "set")
 
-                        print("To switch to cluster mode, run 'aml env cluster'.")
+                        print("To switch to cluster mode, run 'az ml env cluster'.")
                 except AzureCliError as exc:
                     print(exc.message)
                     return
@@ -386,7 +386,7 @@ def env_setup(status, name, context=CommandLineInterfaceContext()):
             ssh_public_key = sshkeyfile.read().rstrip()
     except IOError:
         print('Could not load your SSH public key from {}'.format(os.path.expanduser('~/.ssh/id_rsa.pub')))
-        print('Please run aml env setup again to create a new ssh keypair.')
+        print('Please run az ml env setup again to create a new ssh keypair.')
         return
     print('Setting up your Azure ML environment with a storage account, App Insights account, ACR registry and ACS cluster.')
     if not name:
