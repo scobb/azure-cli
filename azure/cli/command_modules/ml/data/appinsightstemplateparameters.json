@@ -1,0 +1,11 @@
+{
+	"appName": {
+        "value": "<Provide a valid name>"
+	},
+	"applicationType": {
+		"value": "Other (preview)"
+	},
+	"appLocation": {
+		"value": "East US"
+	}
+}
