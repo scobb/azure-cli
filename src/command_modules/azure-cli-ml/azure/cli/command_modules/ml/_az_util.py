@@ -223,6 +223,10 @@ def az_create_storage_account(context, root_name, resource_group, salt=None):
 
             if 'keys' in storage_account_keys:
                 storage_account_keys = storage_account_keys['keys']
+            else:
+                raise AzureCliError(
+                    'Error retrieving storage account keys: {}'.format(
+                        json.dumps(storage_account_keys)))
 
             if len(storage_account_keys) != 2:
                 raise AzureCliError(
