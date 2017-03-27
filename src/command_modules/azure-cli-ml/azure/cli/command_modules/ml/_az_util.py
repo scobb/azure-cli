@@ -57,39 +57,6 @@ def validate_env_name(name):
     return
 
 
-def az_check_components(component_list):
-    """
-    Checks whether the given components are installed in the az cli.
-    :param component_list: The list of components to check for.
-    :return: None if components exist, raises an exception otherwise.
-    """
-    try:
-        az_components = subprocess.check_output(
-            ['az', 'component', 'list', '-o', 'json']).decode('ascii')
-    except subprocess.CalledProcessError as exc:
-        raise AzureCliError(
-            'Error checking for installed components of the Azure CLI. Please ensure you have'
-            ' installed the Azure CLI before setting up your environment ("pip install azure-cli").')
-
-    try:
-        az_components = json.loads(az_components)
-    except ValueError:
-        raise AzureCliError(
-            'Invalid response from Azure CLI. Please report this to deployml@microsoft.com with'
-            ' the following output: {}'.format(az_components))
-
-    installed_components = [x['name'] for x in az_components if
-                            x['name'] in component_list]
-    missing_components = list(set(component_list) - set(installed_components))
-    if missing_components:
-        print(
-        'Please install missing Azure CLI components using the following commands:')
-        print('sudo -i')
-        for component in missing_components:
-            print('az component update --add {}'.format(component))
-        raise AzureCliError('')
-
-
 def az_login():
     """Log in to Azure if not already logged in"""
 
@@ -125,6 +92,7 @@ def az_check_subscription():
             try:
                 subprocess.check_call(
                     ['az', 'account', 'set', '--subscription', new_subscription])
+                print('Subscription updated to {}'.format(new_subscription))
             except subprocess.CalledProcessError:
                 raise AzureCliError('Invalid subscription.')
     else:
