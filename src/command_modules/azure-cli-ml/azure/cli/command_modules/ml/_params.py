@@ -23,13 +23,13 @@ register_cli_argument('ml service run batch', 'job_name', required=False, option
 register_cli_argument('ml service run batch', 'wait_for_completion', required=False, options_list='-w', action='store_true', help='Flag to wait for job synchronously.')
 
 register_cli_argument('ml service', 'inputs', options_list='--in', action='append',
-                      metavar='<input_name>:[<default_value>] [--in=...]',
+                      metavar='<input_name>[:<default_value>] [--in=...]',
                       help='inputs for service to expect', default=[], required=False)
 register_cli_argument('ml service', 'outputs', options_list='--out', action='append',
-                        metavar='<output_name>:[<default_value>] [--out=...]', default=[],
+                        metavar='<output_name>[:<default_value>] [--out=...]', default=[],
                         help='outputs for service to expect', required=False)
 register_cli_argument('ml service', 'parameters', options_list='--param', action='append',
-                        metavar='<parameter_name>:[<default_value>] [--param=...]', default=[],
+                        metavar='<parameter_name>[:<default_value>] [--param=...]', default=[],
                         help='parameters for service to expect', required=False)
 register_cli_argument('ml service', 'dependencies', options_list='-d', action='append',
                       metavar='<dependency> [-d...]', default=[],
