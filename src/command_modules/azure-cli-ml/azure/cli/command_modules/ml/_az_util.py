@@ -94,6 +94,7 @@ def az_login():
     """Log in to Azure if not already logged in"""
 
     try:
+        # TODO - this does not guarantee we don't need to run `az login`
         subprocess.check_call(['az', 'account', 'show'])
     except subprocess.CalledProcessError:
         try:
@@ -155,6 +156,7 @@ def az_create_resource_group(context, root_name):
                 raise AzureCliError(
                     'Unable to create a resource group. Please try again later. Error code: {}'
                         .format(exc.returncode))
+            # TODO - raise regardless
     else:
         print('Resource group {} already exists, skipping creation.'.format(rg_name))
 
