@@ -54,8 +54,6 @@ def validate_env_name(name):
         raise InvalidNameError(
             'Name must only contain lowercase alphanumeric characters.')
 
-    return
-
 
 def az_login():
     """Log in to Azure if not already logged in"""
@@ -120,11 +118,9 @@ def az_create_resource_group(context, root_name):
                 ['az', 'group', 'create', '-l', context.aml_env_default_location, '-n',
                  rg_name])
         except subprocess.CalledProcessError as exc:
-            if output and 'already exists' not in output:
-                raise AzureCliError(
-                    'Unable to create a resource group. Please try again later. Error code: {}'
-                        .format(exc.returncode))
-            # TODO - raise regardless
+            raise AzureCliError(
+                'Unable to create a resource group. Please try again later. Error code: {}'
+                .format(exc.returncode))
     else:
         print('Resource group {} already exists, skipping creation.'.format(rg_name))
 
@@ -139,7 +135,7 @@ def az_register_provider(namespace):
     except subprocess.CalledProcessError as exc:
         raise AzureCliError(
             'Failed to register provider {}. Error details: {}'
-                .format(namespace, exc.output.decode('ascii')))
+                .format(namespace, exc))
 
     registered = False
 
@@ -152,7 +148,7 @@ def az_register_provider(namespace):
         except subprocess.CalledProcessError as exc:
             raise AzureCliError(
                 'Failed to get registration state for provider {}. Error details: {}'
-                    .format(namespace, exc.output.decode('ascii')))
+                    .format(namespace, exc))
 
         try:
             show_output = json.loads(show_output)
