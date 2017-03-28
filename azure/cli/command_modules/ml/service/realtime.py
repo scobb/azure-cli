@@ -324,27 +324,10 @@ def realtime_service_scale(context, args):
     return
 
 
-def realtime_service_delete(context, args):
+def realtime_service_delete(service_name, verb, context=cli_context):
     """Delete a realtime web service."""
 
-    service_name = ''
-    verbose = False
-
-    try:
-        opts, args = getopt.getopt(args, "n:v")
-    except getopt.GetoptError:
-        print("aml service delete realtime -n <service name>")
-        return
-
-    for opt, arg in opts:
-        if opt == '-n':
-            service_name = arg
-        elif opt == '-v':
-            verbose = True
-
-    if service_name == '':
-        print("aml service delete realtime -n <service name>")
-        return
+    verbose = verb
 
     if context.in_local_mode():
         realtime_service_delete_local(service_name, verbose)
@@ -969,41 +952,14 @@ def realtime_service_run_cluster(context, service_name, input_data, verbose):
     return
 
 
-def realtime_service_run(context, args):
+def realtime_service_run(service_name, input_data, verb, context=cli_context):
     """
     Execute a previously published realtime web service.
     :param context: CommandLineInterfaceContext object
     :param args: list of str arguments
     """
 
-    if args is None or not args:
-        print("")
-        print("aml service run realtime -n <service_name> -d <input_data>")
-        print("")
-        return
-
-    service_name = ''
-    input_data = ''
-    verbose = False
-
-    try:
-        opts, args = getopt.getopt(args, "n:d:v")
-    except getopt.GetoptError:
-        print("aml service run realtime -n service name -d input_data")
-        return
-
-    for opt, arg in opts:
-        if opt == '-d':
-            input_data = arg
-        elif opt == '-n':
-            service_name = arg
-        elif opt == '-v':
-            verbose = True
-
-    if service_name == '':
-        print("Error: missing required argument: service_name")
-        print("aml service run realtime -n <service name> -d <input_data>")
-        return
+    verbose = verb
 
     if verbose:
         print("data: {}".format(input_data))
