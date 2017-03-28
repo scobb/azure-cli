@@ -30,8 +30,8 @@ import re
 import shutil
 import requests
 from tabulate import tabulate
-from azure.storage.blob import BlockBlobService
 from builtins import input
+from azure.storage.blob import (BlobPermissions, BlockBlobService, ContentSettings)
 
 ice_base_url = 'https://amlacsagent.azureml-int.net'
 acs_connection_timeout = 5
@@ -53,6 +53,8 @@ class CommandLineInterfaceContext(object):
     aml_env_default_location = 'east us'
     az_account_name = os.environ.get('AML_STORAGE_ACCT_NAME')
     az_account_key = os.environ.get('AML_STORAGE_ACCT_KEY')
+    app_insights_account_name = os.environ.get('AML_APP_INSIGHTS_NAME')
+    app_insights_account_key = os.environ.get('AML_APP_INSIGHTS_KEY', '')
     acs_master_url = os.environ.get('AML_ACS_MASTER')
     acs_agent_url = os.environ.get('AML_ACS_AGENT')
     acr_home = os.environ.get('AML_ACR_HOME')
@@ -167,6 +169,29 @@ class CommandLineInterfaceContext(object):
         bbs.create_blob_from_path(self.az_container_name, az_blob_name, filepath)
         return 'wasbs://{}@{}.blob.core.windows.net/' \
                '{}'.format(self.az_container_name, self.az_account_name, az_blob_name)
+
+    def upload_dependency_to_azure_blob(self, filepath, container, asset_id, content_type='application/octet-stream'):
+        """
+
+        :param filepath: str path to resource to upload
+        :param container: str name of inner container to upload to
+        :param asset_id: str name of asset
+        :param content_type: str content mime type
+        :return: str sas url to uploaded dependency
+        """
+        bbs = BlockBlobService(account_name=self.az_account_name,
+                               account_key=self.az_account_key)
+        bbs.create_container(container)
+        bbs.create_blob_from_path(container, asset_id, filepath,
+                                  content_settings=ContentSettings(content_type=content_type))
+        blob_sas = bbs.generate_blob_shared_access_signature(
+            container_name=container,
+            blob_name=asset_id,
+            permission=BlobPermissions.READ,
+            expiry=datetime.utcnow() + timedelta(days=30)
+        )
+        return 'http://{}.blob.core.windows.net/' \
+               '{}/{}?{}'.format(self.az_account_name, container, asset_id, blob_sas)
 
     @staticmethod
     def cache_local_resource(filepath, container, asset_id):
