@@ -22,6 +22,9 @@ CLASSIFIERS = [
 DEPENDENCIES = [
     'azure-cli-core',
     'azure-storage>=0.33',
+    'azure-cli-acr',
+    'azure-cli-acs',
+    'azure-cli-storage',
     'tabulate>=0.7.7',
     'future',
 ]

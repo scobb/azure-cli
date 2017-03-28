@@ -12,6 +12,7 @@ from __future__ import print_function
 import os
 import json
 import sys
+import platform
 from datetime import datetime, timedelta
 
 try:
@@ -29,6 +30,7 @@ import shutil
 import requests
 from tabulate import tabulate
 from azure.storage.blob import (BlobPermissions, BlockBlobService, ContentSettings)
+from builtins import input
 
 ice_base_url = 'https://amlacsagent.azureml-int.net'
 acs_connection_timeout = 5
@@ -235,6 +237,14 @@ class CommandLineInterfaceContext(object):
     @staticmethod
     def get_args():
         return sys.argv
+
+    @staticmethod
+    def os_is_linux():
+        return platform.system() in ['Linux', 'linux', 'Unix', 'unix']
+
+    @staticmethod
+    def get_input(input_str):
+        return input(input_str)
 
 
 # UTILITY FUNCTIONS

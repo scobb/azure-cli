@@ -11,15 +11,13 @@ Utilities to create and manage realtime web services.
 
 from __future__ import print_function
 
-from datetime import datetime, timedelta
 import os
 import tarfile
 import uuid
-
-from azure.storage.blob import (BlockBlobService, ContentSettings, BlobPermissions)
-from azuremlcli.cli_util import InvalidConfError
-from azuremlcli.cli_util import is_int
 import requests
+
+from .._util import InvalidConfError
+from .._util import is_int
 
 
 class RealtimeConstants(object):
