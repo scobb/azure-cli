@@ -142,3 +142,16 @@ class MockSocket(object):
 
     def close(self):
         pass
+
+
+class MockProcess(object):
+    def __init__(self, output, err):
+        self.output = output
+        self.err = err
+
+    def communicate(self):
+        return self.output, self.err
+
+
+class MockProfile(object):
+    pass

@@ -18,7 +18,6 @@ import uuid
 from pkg_resources import resource_filename
 from pkg_resources import resource_string
 
-
 # EXCEPTIONS
 class Error(Exception):
     """Base class for exceptions raised by this file."""
@@ -57,15 +56,20 @@ def validate_env_name(name):
 
 def az_login():
     """Log in to Azure if not already logged in"""
-
+    from azure.cli.core._profile import Profile
+    from azure.cli.core._util import CLIError
+    profile = Profile()
     try:
-        # TODO - this does not guarantee we don't need to run `az login`
-        subprocess.check_call(['az', 'account', 'show'])
-    except subprocess.CalledProcessError:
-        try:
-            subprocess.check_call(['az', 'login'])
-        except subprocess.CalledProcessError:
-            raise AzureCliError('Error logging in to Azure. Please try again later.')
+        profile.get_subscription()
+    except CLIError as exc:
+        # thrown when not logged in
+        if "'az login'" in exc.message:
+            profile.find_subscriptions_on_login(True, None, None, None, None)
+        elif "'az account set'" in exc.message:
+            # TODO - figure out what to do here..
+            raise
+        else:
+            raise
 
 
 def az_check_subscription():
@@ -281,7 +285,7 @@ def az_create_acr(context, root_name, resource_group, storage_account_name, salt
             if 'already in use' in result:
                 print('An ACR with name {} already exists.'.format(acr_name))
                 salt = str(uuid.uuid4())[:6]
-                return az_create_acr(root_name, resource_group, storage_account_name,
+                return az_create_acr(context, root_name, resource_group, storage_account_name,
                                      salt)
             else:
                 try:
