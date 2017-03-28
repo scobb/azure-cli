@@ -33,6 +33,7 @@ from ._util import ice_connection_timeout
 
 from ._docker_utils import check_docker_credentials
 
+from ._realtimeutilities import RealtimeConstants
 from ._realtimeutilities import resolve_marathon_base_url
 from ._realtimeutilities import get_sample_data
 from ._realtimeutilities import try_add_sample_file
@@ -123,7 +124,7 @@ def get_local_realtime_service_port(service_name, verbose):
         return -2
 
 
-def realtime_service_deploy_local(context, image, verbose):
+def realtime_service_deploy_local(context, image, verbose, app_insights_enabled, logging_level):
     """Deploy a realtime web service locally as a docker container."""
 
     print("[Local mode] Running docker container.")
@@ -146,7 +147,10 @@ def realtime_service_deploy_local(context, image, verbose):
 
     try:
         docker_output = subprocess.check_output(
-            ["docker", "run", "-d", "-P", "-l", "amlid={}".format(service_label), "{}".format(image)]).decode('ascii')
+            ["docker", "run", "-e", "AML_APP_INSIGHTS_KEY={}".format(context.app_insights_account_key),
+                              "-e", "AML_APP_INSIGHTS_ENABLED={}".format(app_insights_enabled),
+                              "-e", "AML_CONSOLE_LOG={}".format(logging_level),
+                              "-d", "-P", "-l", "amlid={}".format(service_label), "{}".format(image)]).decode('ascii')
     except subprocess.CalledProcessError:
         print('[Local mode] Error starting docker container. Please ensure you have permissions to run docker.')
         return
@@ -406,39 +410,20 @@ def realtime_service_delete(context, args):
     return
 
 
-def realtime_service_create(context, args):
+def realtime_service_create(score_file, dependencies, requirements, schema_file, service_name,
+                            verb, custom_ice_url, target_runtime, logging_level, model, context=cli_context):
     """Create a new realtime web service."""
 
-    score_file = ''
-    dependencies = []
-    schema_file = ''
-    service_name = ''
-    verbose = False
-    custom_ice_url = ''
+    verbose = verb
+    if logging_level == 'none':
+        app_insights_enabled = False
+    else:
+        app_insights_enabled = True
 
-    try:
-        opts, args = getopt.getopt(args, "d:f:i:m:n:s:v")
-    except getopt.GetoptError:
-        print("aml service create realtime -f <webservice file> -n <service name> [-m <model1> [-m <model2>] [-d dependency1] [-d dependency2] ...] [-s <schema>]") #pylint: disable=line-too-long
-        return
-
-    for opt, arg in opts:
-        if opt == '-f':
-            score_file = arg
-        elif opt == '-m' or opt == '-d':
-            dependencies.append(arg)
-        elif opt == '-s':
-            dependencies.append(arg)
-            schema_file = arg
-        elif opt == '-n':
-            service_name = arg
-        elif opt == '-v':
-            verbose = True
-        elif opt == '-i':
-            custom_ice_url = arg
-
-    if score_file == '' or service_name == '':
-        print("aml service create realtime -f <webservice file> -n <service name> [-d <dependency1> [-d <dependency2>] ...]") #pylint: disable=line-too-long
+    if (score_file == '' or
+        service_name == '' or
+        target_runtime not in RealtimeConstants.supported_runtimes):
+        print(RealtimeConstants.create_cmd_sample)
         return
 
     storage_exists = False
@@ -481,7 +466,14 @@ def realtime_service_create(context, args):
     payload = resource_string(__name__, 'data/testrequest.json')
     json_payload = json.loads(payload.decode('ascii'))
 
+    # update target runtime in payload
+    json_payload['properties']['deploymentPackage']['targetRuntime'] = target_runtime
+
     # Add dependencies
+
+    # If there's a model specified, add it as a dependency
+    if model:
+        dependencies.append(model)
 
     # Always inject azuremlutilities.py as a dependency from the CLI
     # It contains helper methods for serializing and deserializing schema
@@ -490,15 +482,26 @@ def realtime_service_create(context, args):
 
     # If a schema file was provided, try to find the accompanying sample file
     # and add as a dependency
-    sample_added = False
     get_sample_code = ''
     if schema_file is not '':
+        dependencies.append(schema_file)
         sample_added, sample_filename = try_add_sample_file(dependencies, schema_file, verbose)
         if sample_added:
             get_sample_code = \
                 resource_string(__name__, 'data/getsample.py').decode('ascii').replace('PLACEHOLDER', sample_filename)
 
-    dependency_injection_code = '\nimport tarfile\nimport azuremlutilities\n'
+    if requirements is not '':
+        if verbose:
+            print('Uploading requirements file: {}'.format(requirements))
+            (status, location, filename) = \
+                upload_dependency(context, requirements, verbose)
+            if status < 0:
+                print('Error resolving requirements file: no such file or directory {}'.format(requirements))
+                return
+            else:
+                json_payload['properties']['deploymentPackage']['pipRequirements'] = location
+
+    dependency_injection_code = '\nimport tarfile\n'
     dependency_count = 0
     if dependencies is not None:
         print('Uploading dependencies.')
@@ -538,15 +541,19 @@ def realtime_service_create(context, args):
         print("Error: No such file {}".format(score_file))
         return
 
-    # read in fixed preamble code
-    preamble = resource_string(__name__, 'data/preamble').decode('ascii')
+    if target_runtime == 'spark-py':
+        # read in fixed preamble code
+        preamble = resource_string(__name__, 'data/preamble').decode('ascii')
 
-    # wasb configuration: add the configured storage account in the as a wasb location
-    wasb_config = "spark.sparkContext._jsc.hadoopConfiguration().set('fs.azure.account.key." + \
-                  context.az_account_name + ".blob.core.windows.net','" + context.az_account_key + "')"
+        # wasb configuration: add the configured storage account in the as a wasb location
+        wasb_config = "spark.sparkContext._jsc.hadoopConfiguration().set('fs.azure.account.key." + \
+                      context.az_account_name + ".blob.core.windows.net','" + context.az_account_key + "')"
 
-    # create blob with preamble code and user function definitions from cell
-    code = "{}\n{}\n{}\n{}\n\n\n{}".format(preamble, wasb_config, dependency_injection_code, code, get_sample_code)
+        # create blob with preamble code and user function definitions from cell
+        code = "{}\n{}\n{}\n{}\n\n\n{}".format(preamble, wasb_config, dependency_injection_code, code, get_sample_code)
+    else:
+        code = "{}\n{}\n\n\n{}".format(dependency_injection_code, code, get_sample_code)
+
     if verbose:
         print(code)
     az_container_name = 'amlbdpackages'
@@ -604,7 +611,7 @@ def realtime_service_create(context, args):
     create_url = base_ice_url + '/images/' + service_name
     get_url = base_ice_url + '/jobs'
 
-    headers = {'Content-Type': 'application/json'}
+    headers = {'Content-Type': 'application/json', 'User-Agent': 'aml-cli-preview-060317'}
 
     image = ''
     try:
@@ -662,10 +669,10 @@ def realtime_service_create(context, args):
     print('done.')
     print('Image available at : {}'.format(acs_payload['container']['docker']['image']))
     if context.in_local_mode():
-        realtime_service_deploy_local(context, image, verbose)
+        realtime_service_deploy_local(context, image, verbose, app_insights_enabled, logging_level)
         exit()
     else:
-        realtime_service_deploy(context, image, service_name)
+        realtime_service_deploy(context, image, service_name, app_insights_enabled, logging_level)
         return
 
 
@@ -719,25 +726,14 @@ def realtime_service_deploy(context, image, app_id):
     return
 
 
-def realtime_service_view(context, args):
+def realtime_service_view(service_name=None, verb=False, context=cli_context):
     """View details of a previously published realtime web service."""
 
-    verbose = False
+    verbose = verb
     pass_on_args = []
 
-    if '-v' in args:
-        verbose = True
-        args = [x for x in args if x != '-v']
-        pass_on_args.append('-v')
-
-    if len(args) != 1:
-        print('Usage: aml service view realtime <service_name> [-v]')
-        return
-
-    service_name = args[0]
-
     # First print the list view of this service
-    realtime_service_list(context, pass_on_args, service_name)
+    realtime_service_list(service_name, verb, context)
 
     scoring_url = None
     usage_headers = ['-H "Content-Type:application/json"']
