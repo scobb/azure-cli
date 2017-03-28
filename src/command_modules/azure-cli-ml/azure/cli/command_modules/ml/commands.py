@@ -18,3 +18,4 @@ cli_command(__name__, 'ml service create realtime', 'azure.cli.command_modules.m
 cli_command(__name__, 'ml service list realtime', 'azure.cli.command_modules.ml.service.realtime#realtime_service_list')
 cli_command(__name__, 'ml service view realtime', 'azure.cli.command_modules.ml.service.realtime#realtime_service_view')
 cli_command(__name__, 'ml service delete realtime', 'azure.cli.command_modules.ml.service.realtime#realtime_service_delete')
+cli_command(__name__, 'ml service run realtime', 'azure.cli.command_modules.ml.service.realtime#realtime_service_run')
