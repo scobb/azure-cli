@@ -24,7 +24,8 @@ from .._util import is_int
 
 class RealtimeConstants(object):
     supported_runtimes = ['spark-py', 'cntk-py', 'tensorflow-py', 'scikit-py']
-    create_cmd_sample = "aml service create realtime -f <webservice file> -n <service name> [-m <model1> [-m <model2>] ...] [-p requirements.txt] [-s <schema>] [-r {0}]".format("|".join(supported_runtimes))  # pylint: disable=line-too-long
+    supported_logging_levels = ['none', 'info', 'debug', 'warn', 'trace']
+    create_cmd_sample = "aml service create realtime -f <webservice file> -n <service name> [-m <model1> [-m <model2>] ...] [-p requirements.txt] [-s <schema>] [-r {0}] [-l {1}]".format("|".join(supported_runtimes), "|".join(supported_logging_levels))  # pylint: disable=line-too-long
 
 
 def upload_dependency(context, dependency, verbose):
