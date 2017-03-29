@@ -27,9 +27,9 @@ import tabulate
 
 from azure.storage.blob import (BlockBlobService, ContentSettings, BlobPermissions)
 
-from ._util import cli_context
-from ._util import is_int
-from ._util import ice_connection_timeout
+from .._util import cli_context
+from .._util import is_int
+from .._util import ice_connection_timeout
 
 from ._docker_utils import check_docker_credentials
 
