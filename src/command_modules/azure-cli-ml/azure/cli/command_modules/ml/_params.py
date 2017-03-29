@@ -14,53 +14,53 @@ from .service._realtimeutilities import RealtimeConstants
 register_cli_argument('', 'context', arg_type=ignore_type)
 
 # used throughout
-register_cli_argument('ml', 'verb', options_list='-v', required=False, help='Verbosity flag.', action='store_true')
+register_cli_argument('ml', 'verb', options_list=('-v',), required=False, help='Verbosity flag.', action='store_true')
 
-register_cli_argument('ml service', 'service_name', options_list='-n', help='Webservice name.')
-register_cli_argument('ml service', 'job_name', options_list='-j', help='Job name.')
-register_cli_argument('ml service', 'dependencies', options_list='-d', action='append',
+register_cli_argument('ml service', 'service_name', options_list=('-n',), help='Webservice name.')
+register_cli_argument('ml service', 'job_name', options_list=('-j',), help='Job name.')
+register_cli_argument('ml service', 'dependencies', options_list=('-d',), action='append',
                       metavar='<dependency> [-d...]', default=[],
                         help='Files and directories required by the service. Multiple dependencies can be specified with additional -d arguments.', required=False)
 
 # batch workflows
 register_cli_argument('ml service create batch', 'driver_file', options_list=('-f', '--driver-file'))
 register_cli_argument('ml service create batch', 'title', required=False)
-register_cli_argument('ml service run batch', 'job_name', required=False, options_list='-j', help='Job name. Defaults to a formatted timestamp (%Y-%m-%d_%H%M%S)')
-register_cli_argument('ml service run batch', 'wait_for_completion', required=False, options_list='-w', action='store_true', help='Flag to wait for job synchronously.')
-register_cli_argument('ml service', 'inputs', options_list='--in', action='append',
+register_cli_argument('ml service run batch', 'job_name', required=False, options_list=('-j',), help='Job name. Defaults to a formatted timestamp (%Y-%m-%d_%H%M%S)')
+register_cli_argument('ml service run batch', 'wait_for_completion', required=False, options_list=('-w',), action='store_true', help='Flag to wait for job synchronously.')
+register_cli_argument('ml service', 'inputs', options_list=('--in',), action='append',
                       metavar='<input_name>[:<default_value>] [--in=...]',
                       help='inputs for service to expect', default=[], required=False)
-register_cli_argument('ml service', 'outputs', options_list='--out', action='append',
+register_cli_argument('ml service', 'outputs', options_list=('--out',), action='append',
                         metavar='<output_name>[:<default_value>] [--out=...]', default=[],
                         help='outputs for service to expect', required=False)
-register_cli_argument('ml service', 'parameters', options_list='--param', action='append',
+register_cli_argument('ml service', 'parameters', options_list=('--param',), action='append',
                         metavar='<parameter_name>[:<default_value>] [--param=...]', default=[],
                         help='parameters for service to expect', required=False)
 
 # realtime workflows
-register_cli_argument('ml service create realtime', 'score_file', options_list='-f', metavar='filename',
+register_cli_argument('ml service create realtime', 'score_file', options_list=('-f',), metavar='filename',
                       help='The code file to be deployed.')
-register_cli_argument('ml service create realtime', 'requirements', options_list='-p',
+register_cli_argument('ml service create realtime', 'requirements', options_list=('-p',),
                       metavar='requirements.txt', default='', help='A pip requirements.txt file of packages needed by the code file.', required=False)
-register_cli_argument('ml service create realtime', 'model', options_list='-m',
+register_cli_argument('ml service create realtime', 'model', options_list=('-m',),
                       default='', help='The model to be deployed.', required=False)
 # TODO: Add documentation about schema file format
-register_cli_argument('ml service create realtime', 'schema_file', options_list='-s', default='', required=False,
+register_cli_argument('ml service create realtime', 'schema_file', options_list=('-s',), default='', required=False,
                       help='Input and output schema of the web service.')
-register_cli_argument('ml service create realtime', 'custom_ice_url', options_list='-i', default='', required=False,
+register_cli_argument('ml service create realtime', 'custom_ice_url', options_list=('-i',), default='', required=False,
                       help=argparse.SUPPRESS)
-register_cli_argument('ml service create realtime', 'target_runtime', options_list='-r', default='spark-py',
+register_cli_argument('ml service create realtime', 'target_runtime', options_list=('-r',), default='spark-py',
                       help='Runtime of the web service. Valid runtimes are {}'.format('|'.join(RealtimeConstants.supported_runtimes)), required=False)
-register_cli_argument('ml service create realtime', 'logging_level', options_list='-l', default='none', const = 'debug',
+register_cli_argument('ml service create realtime', 'logging_level', options_list=('-l',), default='none', const = 'debug',
                       nargs='?', help='Logging level. Valid levels are {}'.format('|'.join(RealtimeConstants.supported_logging_levels)), required=False)
-register_cli_argument('ml service run realtime', 'input_data', options_list='-d', default='',
+register_cli_argument('ml service run realtime', 'input_data', options_list=('-d',), default='',
                       help='The data to use for calling the web service.', required=False)
 
 # env workflows
-register_cli_argument('ml env cluster', 'force_connection', options_list='-f', action='store_true',
+register_cli_argument('ml env cluster', 'force_connection', options_list=('-f',), action='store_true',
                        help='Force direct connection to ACS cluster.',
                       required=False)
-register_cli_argument('ml env cluster', 'forwarded_port', options_list='-p', nargs='?',
+register_cli_argument('ml env cluster', 'forwarded_port', options_list=('-p',), nargs='?',
                       const=None, default=-1, type=int, required=False,
                       help='Use port forwarding. If a port number is specified, test for an existing tunnel. Without a port number, try to set up an ssh tunnel through an unused port.' #pylint: disable=line-too-long
                       )
