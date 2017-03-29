@@ -17,6 +17,19 @@ import subprocess
 import uuid
 from pkg_resources import resource_filename
 from pkg_resources import resource_string
+from azure.cli.core._profile import Profile
+from azure.cli.core._config import az_config
+from azure.cli.core._util import CLIError
+from azure.cli.core.commands import client_factory
+import azure.cli.core.azlogging as azlogging
+from azure.mgmt.containerregistry.container_registry_management_client import ContainerRegistryManagementClient
+from azure.mgmt.containerregistry.models import Registry
+from azure.mgmt.containerregistry.models.storage_account_properties import StorageAccountProperties
+from azure.mgmt.storage.storage_management_client import StorageManagementClient
+from azure.mgmt.storage.models import SkuTier
+
+logger = azlogging.get_az_logger(__name__)
+
 
 # EXCEPTIONS
 class Error(Exception):
@@ -56,7 +69,6 @@ def validate_env_name(name):
 
 def az_login():
     """Log in to Azure if not already logged in"""
-    from azure.cli.core._profile import Profile
     from azure.cli.core._util import CLIError
     profile = Profile()
     try:
@@ -78,7 +90,6 @@ def az_check_subscription():
     Assumes user is logged in to az.
     """
 
-    from azure.cli.core._profile import Profile
     profile = Profile()
     current_subscription = profile.get_subscription()['name']
     print('Subscription set to {}'.format(current_subscription))
@@ -247,7 +258,7 @@ def az_create_storage_account(context, root_name, resource_group, salt=None):
                 .format(json.dumps(storage_create_output)))
 
 
-def az_create_acr(context, root_name, resource_group, storage_account_name, salt=None):
+def az_create_acr(context, root_name, resource_group, storage_account_name):
     """
     Create an ACR registry using the Azure CLI (az).
     :param context: CommandLineInterfaceContext object
@@ -257,62 +268,45 @@ def az_create_acr(context, root_name, resource_group, storage_account_name, salt
     :return: Tuple - the ACR login server, username, and password
     """
 
-    az_register_provider('Microsoft.ContainerRegistry')
     acr_name = root_name + 'acr'
-    if salt:
-        acr_name = acr_name + salt
-
-    print(
+    logger.info(
     'Creating ACR registry: {} (please be patient, this can take several minutes)'.format(
         acr_name))
-    try:
-        acr_create = subprocess.Popen(
-            ['az', 'acr', 'create', '-n', acr_name, '-l',
-             context.aml_env_default_location, '-g', resource_group,
-             '--storage-account-name', storage_account_name, '--admin-enabled', 'true',
-             '-o', 'json'],
-            stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        output, err = acr_create.communicate()
-        if err:
-            result = err.decode('ascii')
-            if 'already in use' in result:
-                print('An ACR with name {} already exists.'.format(acr_name))
-                salt = str(uuid.uuid4())[:6]
-                return az_create_acr(context, root_name, resource_group, storage_account_name,
-                                     salt)
-            else:
-                try:
-                    acr_create_result = json.loads(output.decode('ascii'))
-                    if 'loginServer' not in acr_create_result:
-                        raise AzureCliError(
-                            'ACR metadata was malformed. Metadata received: {}'.format(
-                                json.dumps(acr_create_result)))
-                    acr_login_server = acr_create_result['loginServer']
-                except ValueError:
-                    raise AzureCliError(
-                        'Error creating ACR. Please try again later. Response from az was not json: {}.'.format(
-                            output))
-    except AzureCliError:
-        raise
-    except Exception as exc:
-        raise AzureCliError(
-            'Error creating ACR. Please try again later. Error: {}'.format(exc))
+    customized_acr_version = az_config.get('acr', 'apiversion', None)
+    if customized_acr_version:
+        logger.warning('Customized ACR api-version is used: %s', customized_acr_version)
+        acr_client = client_factory.get_mgmt_service_client(ContainerRegistryManagementClient,
+                                                        api_version=customized_acr_version).registries
+    else:
+        acr_client = client_factory.get_mgmt_service_client(ContainerRegistryManagementClient).registries
 
-    try:
-        acr_credentials = subprocess.check_output(
-            ['az', 'acr', 'credential', 'show', '-n', acr_name, '-o', 'json'])
-    except subprocess.CalledProcessError:
-        raise AzureCliError('Error retrieving ACR credentials. ')
+    # get storage account, keys
+    storage_client = client_factory.get_mgmt_service_client(StorageManagementClient).storage_accounts
+    storage_account = storage_client.get_properties(resource_group, storage_account_name)
 
-    try:
-        acr_credentials = json.loads(acr_credentials.decode('ascii'))
-    except ValueError:
-        raise AzureCliError('Error retrieving ACR credentials. Please try again later.')
+    if storage_account.sku.tier == SkuTier.premium: #pylint: disable=no-member
+        raise CLIError('Premium storage account {} is currently not supported. ' \
+                       'Please use standard storage account.'.format(storage_account_name))
 
-    acr_username = acr_credentials['username']
-    acr_password = acr_credentials['password']
+    storage_key = storage_client.list_keys(resource_group, storage_account_name).keys[0].value #pylint: disable=no-member
 
-    return acr_login_server, acr_username, acr_password
+    # create acr
+    registry = acr_client.create_or_update(
+        resource_group, acr_name,
+        Registry(
+            location=context.aml_env_default_location,
+            storage_account=StorageAccountProperties(
+                storage_account_name,
+                storage_key
+            ),
+            admin_user_enabled=True
+        )
+    )
+
+    # get acr credential
+    acr_creds = acr_client.get_credentials(resource_group, acr_name)
+
+    return registry.login_server, acr_creds.username, acr_creds.password
 
 
 def az_create_acs(root_name, resource_group, acr_login_server, acr_username,
