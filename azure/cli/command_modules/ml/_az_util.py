@@ -27,6 +27,8 @@ from azure.mgmt.containerregistry.models import Registry
 from azure.mgmt.containerregistry.models.storage_account_properties import StorageAccountProperties
 from azure.mgmt.storage.storage_management_client import StorageManagementClient
 from azure.mgmt.storage.models import SkuTier
+from azure.mgmt.resource.resources.models import ResourceGroup
+from azure.mgmt.resource.resources import ResourceManagementClient
 
 logger = azlogging.get_az_logger(__name__)
 
@@ -110,27 +112,15 @@ def az_create_resource_group(context, root_name):
     """Create a resource group using root_name as a prefix"""
 
     rg_name = root_name + 'rg'
-    try:
-        rg_exists = subprocess.check_output(
-            ['az', 'group', 'exists', '-n', rg_name, '-o', 'json'])
-        rg_exists = rg_exists.decode('ascii').rstrip()
-    except subprocess.CalledProcessError:
-        # If the check fails for some reason, try to create anyway
-        rg_exists = None
+    rg_client = client_factory.get_mgmt_service_client(ResourceManagementClient).resource_groups
 
-    if not rg_exists or (rg_exists and rg_exists != 'true'):
-        print('Creating resource group {}.'.format(rg_name))
-        output = None
-        try:
-            output = subprocess.check_output(
-                ['az', 'group', 'create', '-l', context.aml_env_default_location, '-n',
-                 rg_name])
-        except subprocess.CalledProcessError as exc:
-            raise AzureCliError(
-                'Unable to create a resource group. Please try again later. Error code: {}'
-                .format(exc.returncode))
-    else:
+    if rg_client.check_existence(rg_name):
         print('Resource group {} already exists, skipping creation.'.format(rg_name))
+    else:
+        rg_client.create_or_update(
+            rg_name,
+            ResourceGroup(location=context.aml_env_default_location)
+        )
 
     return rg_name
 
