@@ -127,43 +127,8 @@ def az_create_resource_group(context, root_name):
 
 def az_register_provider(namespace):
     """ Registers a given resource provider with Azure."""
-    try:
-        subprocess.check_call(
-            ['az', 'provider', 'register', '-n', namespace], stderr=subprocess.STDOUT)
-    except subprocess.CalledProcessError as exc:
-        raise AzureCliError(
-            'Failed to register provider {}. Error details: {}'
-                .format(namespace, exc))
-
-    registered = False
-
-    while not registered:
-        try:
-            show_output = subprocess.check_output(
-                ['az', 'provider', 'show', '-n', namespace, '-o', 'json'],
-                stderr=subprocess.STDOUT)
-            show_output = show_output.decode('ascii')
-        except subprocess.CalledProcessError as exc:
-            raise AzureCliError(
-                'Failed to get registration state for provider {}. Error details: {}'
-                    .format(namespace, exc))
-
-        try:
-            show_output = json.loads(show_output)
-        except ValueError:
-            raise AzureCliError(
-                'Malformed response when getting registration state. Please report to deployml@microsoft.com with this output: {}'  # pylint: disable=line-too-long
-                    .format(show_output))
-
-        if 'registrationState' not in show_output:
-            raise AzureCliError(
-                'Malformed response when getting registration state. Please report to deployml@microsoft.com with this output: {}'  # pylint: disable=line-too-long
-                    .format(json.dumps(show_output)))
-
-        if show_output['registrationState'] == 'Registered':
-            registered = True
-
-    return registered
+    client = client_factory.get_mgmt_service_client(ResourceManagementClient).providers
+    client.register(namespace)
 
 
 def az_create_storage_account(context, root_name, resource_group, salt=None):
