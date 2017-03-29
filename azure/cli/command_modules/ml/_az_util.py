@@ -73,33 +73,26 @@ def az_login():
 
 
 def az_check_subscription():
-    """Check whether the user wants to use the current default subscription"""
+    """
+    Check whether the user wants to use the current default subscription
+    Assumes user is logged in to az.
+    """
 
-    try:
-        az_account_result = subprocess.check_output(
-            ['az', 'account', 'show', '-o', 'json']).decode('ascii')
-        az_account_result = json.loads(az_account_result)
-    except (subprocess.CalledProcessError, ValueError):
-        raise AzureCliError(
-            'Error retrieving subscription information from Azure. Please try again later.')
-
-    if 'name' in az_account_result:
-        current_subscription = az_account_result['name']
-        print('Subscription set to {}'.format(current_subscription))
-        answer = input('Continue with this subscription (Y/n)? ')
-        answer = answer.rstrip().lower()
-        if answer == 'n' or answer == 'no':
-            new_subscription = input('Enter subscription name: ')
-            new_subscription = new_subscription.rstrip()
-            try:
-                subprocess.check_call(
-                    ['az', 'account', 'set', '--subscription', new_subscription])
-                print('Subscription updated to {}'.format(new_subscription))
-            except subprocess.CalledProcessError:
-                raise AzureCliError('Invalid subscription.')
-    else:
-        raise AzureCliError(
-            'Error retrieving subscription information from Azure. Please try again later.')
+    from azure.cli.core._profile import Profile
+    profile = Profile()
+    current_subscription = profile.get_subscription()['name']
+    print('Subscription set to {}'.format(current_subscription))
+    answer = input('Continue with this subscription (Y/n)? ')
+    answer = answer.rstrip().lower()
+    if answer == 'n' or answer == 'no':
+        print("Available subscriptions:\n  {}".format('\n  '.join(
+            [sub['name'] for sub in profile.load_cached_subscriptions()])))
+        new_subscription = input('Enter subscription name: ')
+        new_subscription = new_subscription.rstrip()
+        profile.set_active_subscription(
+            profile.get_subscription(new_subscription)['name'])
+        print('Active subscription updated to {}'.format(
+            profile.get_subscription()['name']))
 
 
 def az_create_resource_group(context, root_name):
