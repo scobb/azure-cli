@@ -108,7 +108,8 @@ def az_check_subscription():
             profile.get_subscription()['name']))
 
 
-def az_create_resource_group(context, root_name):
+from ._util import CommandLineInterfaceContext
+def az_create_resource_group(root_name, context=CommandLineInterfaceContext()):
     """Create a resource group using root_name as a prefix"""
 
     rg_name = root_name + 'rg'
@@ -131,7 +132,7 @@ def az_register_provider(namespace):
     client.register(namespace)
 
 
-def az_create_storage_account(context, root_name, resource_group, salt=None):
+def az_create_storage_account(root_name, resource_group, salt=None, context=CommandLineInterfaceContext):
     """
     Create a storage account for the AML environment.
     :param context: CommandLineInterfaceContext object
@@ -141,76 +142,25 @@ def az_create_storage_account(context, root_name, resource_group, salt=None):
     :return: string - the name of the storage account created, if successful.
     """
 
+    from azure.mgmt.storage.models import \
+        (StorageAccountCreateParameters, Sku)
     storage_account_name = root_name + 'stor'
     if salt:
         storage_account_name = storage_account_name + salt
 
     az_register_provider('Microsoft.Storage')
-    try:
-        print('Creating storage account {}.'.format(storage_account_name))
-        storage_create_output = subprocess.check_output(
-            ['az', 'storage', 'account', 'create', '-g', resource_group, '-l',
-             context.aml_env_default_location, '-n',
-             storage_account_name, '--sku', 'Standard_LRS', '-o', 'json'],
-            stderr=subprocess.STDOUT).decode('ascii')
-    except subprocess.CalledProcessError as exc:
-        if 'already taken' in exc.output.decode('ascii'):
-            print(
-            'A storage account named {} already exists.'.format(storage_account_name))
-            salt = str(uuid.uuid4())[:6]
-            return az_create_storage_account(context, root_name, resource_group, salt)
-        else:
-            raise AzureCliError(
-                'Error creating storage account. Please report this to deployml@microsoft.com with the following output: {}'  # pylint: disable=line-too-long
-                    .format(exc.output))
 
-    try:
-        storage_create_output = json.loads(storage_create_output)
-        if 'provisioningState' in storage_create_output and storage_create_output[
-            'provisioningState'] == 'Succeeded':
-            try:
-                storage_account_keys = subprocess.check_output(
-                    ['az', 'storage', 'account', 'keys', 'list', '-n',
-                     storage_account_name, '-g', resource_group,
-                     '-o', 'json'],
-                    stderr=subprocess.STDOUT)
-            except subprocess.CalledProcessError as exc:
-                raise AzureCliError(
-                    'Error retrieving storage account keys: {}'.format(exc.output))
+    print('Creating storage account {}.'.format(storage_account_name))
+    client = client_factory.get_mgmt_service_client(StorageManagementClient).storage_accounts
+    client.create(resource_group, storage_account_name,
+                  StorageAccountCreateParameters(
+                      location=context.aml_env_default_location,
+                      sku=Sku('Standard_LRS'),
+                      kind='Storage',
+                  )).wait()
+    keys = client.list_keys(resource_group, storage_account_name).keys
 
-            try:
-                storage_account_keys = json.loads(storage_account_keys.decode('ascii'))
-            except ValueError:
-                raise AzureCliError('Error retrieving storage account keys: {}'.format(
-                    storage_account_keys))
-
-            if 'keys' in storage_account_keys:
-                storage_account_keys = storage_account_keys['keys']
-            else:
-                raise AzureCliError(
-                    'Error retrieving storage account keys: {}'.format(
-                        json.dumps(storage_account_keys)))
-
-            if len(storage_account_keys) != 2:
-                raise AzureCliError(
-                    'Error retrieving storage account keys: {}'.format(
-                        json.dumps(storage_account_keys)))
-
-            if 'keyName' not in storage_account_keys[1] or 'value' not in \
-                    storage_account_keys[1]:
-                raise AzureCliError(
-                    'Error retrieving storage account keys: {}'.format(
-                        json.dumps(storage_account_keys)))
-
-            return storage_account_name, storage_account_keys[1]['value']
-        else:
-            raise AzureCliError(
-                'Malformed response while creating storage account. Please report this to deployml@microsoft.com with the following output: {}'  # pylint: disable=line-too-long
-                    .format(json.dumps(storage_create_output)))
-    except ValueError:
-        raise AzureCliError(
-            'Malformed response while creating storage account. Please report this to deployml@microsoft.com with the following output: {}'  # pylint: disable=line-too-long
-                .format(json.dumps(storage_create_output)))
+    return storage_account_name, keys[0].value
 
 
 def az_create_acr(context, root_name, resource_group, storage_account_name):
