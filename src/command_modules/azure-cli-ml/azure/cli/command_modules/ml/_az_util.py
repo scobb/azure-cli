@@ -13,9 +13,6 @@ from builtins import input
 import datetime
 import json
 import re
-import subprocess
-import uuid
-from pkg_resources import resource_filename
 from pkg_resources import resource_string
 from azure.cli.core._profile import Profile
 from azure.cli.core._config import az_config
@@ -29,6 +26,7 @@ from azure.mgmt.storage.storage_management_client import StorageManagementClient
 from azure.mgmt.storage.models import SkuTier
 from azure.mgmt.resource.resources.models import ResourceGroup
 from azure.mgmt.resource.resources import ResourceManagementClient
+from azure.mgmt.resource.resources.models import DeploymentProperties
 
 logger = azlogging.get_az_logger(__name__)
 
@@ -71,7 +69,6 @@ def validate_env_name(name):
 
 def az_login():
     """Log in to Azure if not already logged in"""
-    from azure.cli.core._util import CLIError
     profile = Profile()
     try:
         profile.get_subscription()
@@ -108,8 +105,7 @@ def az_check_subscription():
             profile.get_subscription()['name']))
 
 
-from ._util import CommandLineInterfaceContext
-def az_create_resource_group(root_name, context=CommandLineInterfaceContext()):
+def az_create_resource_group(context, root_name):
     """Create a resource group using root_name as a prefix"""
 
     rg_name = root_name + 'rg'
@@ -132,7 +128,7 @@ def az_register_provider(namespace):
     client.register(namespace)
 
 
-def az_create_storage_account(root_name, resource_group, salt=None, context=CommandLineInterfaceContext):
+def az_create_storage_account(context, root_name, resource_group, salt=None):
     """
     Create a storage account for the AML environment.
     :param context: CommandLineInterfaceContext object
@@ -230,7 +226,7 @@ def az_create_acs(root_name, resource_group, acr_login_server, acr_username,
     """
 
     # Load the parameters file
-    template_file = resource_filename(__name__, 'data/acstemplate.json')
+    template = json.loads(resource_string(__name__, 'data/acstemplate.json').decode('ascii'))
     parameters = json.loads(
         resource_string(__name__, 'data/acstemplateparameters.json').decode('ascii'))
     deployment_name = resource_group + 'deploymentacs' + datetime.datetime.now().strftime(
@@ -244,63 +240,16 @@ def az_create_acs(root_name, resource_group, acr_login_server, acr_username,
     parameters['azureContainerRegistryUsername']['value'] = acr_username
     parameters['azureContainerRegistryPassword']['value'] = acr_password
 
-    try:
-        subprocess.check_output(
-            ['az', 'group', 'deployment', 'create', '-g', resource_group, '-n',
-             deployment_name, '--template-file',
-             template_file, '--parameters', json.dumps(parameters), '--no-wait'],
-            stderr=subprocess.STDOUT)
-    except subprocess.CalledProcessError as exc:
-        if exc.output:
-            result = exc.output.decode('ascii')
-            if 'is not valid according' in result:
-                print(
-                    'ACS provisioning via template failed. This might mean you do not have enough resources in your subscription.')  # pylint: disable=line-too-long
-                s = re.search(r"tracking id is '(?P<tracking_id>.+)'", result)
-                if s:
-                    print('The tracking id is {}.'.format(s.group('tracking_id')))
-                    print(
-                    'You can login to https://portal.azure.com to find more details about this error.')
-
-        raise AzureCliError('Error creating ACS from template. Error details {}'.format(
-            exc.output.decode('ascii')))
+    properties = DeploymentProperties(template=template, parameters=parameters, mode='incremental')
+    client = client_factory.get_mgmt_service_client(ResourceManagementClient).deployments
+    client.create_or_update(resource_group, deployment_name, properties, raw=True)
 
     print(
     'Started ACS deployment. Please note that it can take up to 15 minutes to complete the deployment.')
     print(
     'You can continue to work with aml in local mode while the ACS is being provisioned.')
-    print("To check the status of the deployment, run 'aml env setup -s {}'".format(
+    print("To check the status of the deployment, run 'az ml env setup -s {}'".format(
         deployment_name))
-
-
-def az_parse_acs_outputs(completed_deployment):
-    """
-    Parses the outputs from a completed acs template deployment.
-    :param completed_deployment: The dictionary object returned from the completed template deployment.
-    :return: A tuple of DNS names for the ACS master and agent.
-    """
-
-    if 'properties' not in completed_deployment or 'outputs' not in completed_deployment[
-        'properties']:
-        raise AzureCliError(
-            'No outputs in deployment. Please report this to deployml@microsoft.com, with the following json in your error report: {}'  # pylint: disable=line-too-long
-                .format(json.dumps(completed_deployment)))
-
-    if 'agentpublicFQDN' not in completed_deployment['properties']['outputs'] \
-            or 'masterFQDN' not in completed_deployment['properties']['outputs']:
-        raise AzureCliError(
-            'Malformed output in deployment. Please report this to deployml@microsoft.com, with the following json in your error report: {}'  # pylint: disable=line-too-long
-                .format(json.dumps(completed_deployment)))
-
-    if 'value' not in completed_deployment['properties']['outputs']['masterFQDN'] \
-            or 'value' not in completed_deployment['properties']['outputs'][
-                'agentpublicFQDN']:
-        raise AzureCliError(
-            'Malformed output in deployment. Please report this to deployml@microsoft.com, with the following json in your error report: {}'  # pylint: disable=line-too-long
-                .format(json.dumps(completed_deployment)))
-
-    return completed_deployment['properties']['outputs']['masterFQDN']['value'], \
-           completed_deployment['properties']['outputs']['agentpublicFQDN']['value']
 
 
 def az_get_app_insights_account(completed_deployment):
@@ -310,43 +259,24 @@ def az_get_app_insights_account(completed_deployment):
     :param completed_deployment: The dictionary object returned from the completed template deployment.
     :return: A tuple of the app insights account name and instrumentation key.
     """
-
-    if 'resourceGroup' not in completed_deployment:
-        az_throw_malformed_json_error(completed_deployment)
-
-    if 'properties' not in completed_deployment or 'parameters' not in \
-            completed_deployment['properties']:
-        az_throw_malformed_json_error(completed_deployment)
-
-    if 'appName' not in completed_deployment['properties'][
-        'parameters'] or 'value' not in completed_deployment['properties']['parameters'][
-        'appName']:
-        az_throw_malformed_json_error(completed_deployment)
-
-    resource_group = completed_deployment['resourceGroup']
-    resource_name = completed_deployment['properties']['parameters']['appName']['value']
-
-    try:
-        app_insights_get_output = subprocess.check_output(
-            ['az', 'resource', 'show', '-g', resource_group, '--resource-type',
-             'microsoft.insights/components', '-n', resource_name],
-            stderr=subprocess.STDOUT).decode('ascii')
-    except subprocess.CalledProcessError as exc:
-        raise AzureCliError(
-            'Error getting created app insights account. Error details {}'.format(
-                exc.output.decode('ascii')))
-
-    try:
-        app_insights_get_output = json.loads(app_insights_get_output)
-
-        if 'properties' in app_insights_get_output and 'InstrumentationKey' in \
-                app_insights_get_output['properties']:
-            return resource_name, app_insights_get_output['properties'][
-                'InstrumentationKey']
-
-        az_throw_malformed_json_error(app_insights_get_output)
-    except ValueError:
-        az_throw_malformed_json_error(app_insights_get_output)
+    rp_namespace = 'microsoft.insights'
+    resource_type = 'components'
+    resource_name = completed_deployment.properties.parameters['appName']['value']
+    resource_group = completed_deployment.name.split('deployment')[0]
+    rcf = client_factory.get_mgmt_service_client(ResourceManagementClient)
+    provider = rcf.providers.get(rp_namespace)
+    resource_types = [t for t in provider.resource_types
+                      if t.resource_type.lower() == resource_type]
+    if len(resource_types) != 1 or not resource_types[0].api_versions:
+        raise CLIError('Error finding api version for App Insights.')
+    non_preview_versions = [v for v in resource_types[0].api_versions
+                            if 'preview' not in v.lower()]
+    api_version = non_preview_versions[0] if non_preview_versions else \
+        resource_types[0].api_versions[0]
+    resource_client = rcf.resources
+    result = resource_client.get(resource_group, rp_namespace, '', resource_type,
+                                 resource_name, api_version)
+    return resource_name, result.properties['InstrumentationKey']
 
 
 def az_create_app_insights_account(context, root_name, resource_group):
@@ -364,7 +294,8 @@ def az_create_app_insights_account(context, root_name, resource_group):
     app_insights_account_name = root_name + 'app_ins'
 
     # Load the parameters file
-    template_file = resource_filename(__name__, 'data/appinsightstemplate.json')
+    template = json.loads(
+        resource_string(__name__, 'data/appinsightstemplate.json').decode('ascii'))
     parameters = json.loads(
         resource_string(__name__, 'data/appinsightstemplateparameters.json').decode(
             'ascii'))
@@ -372,30 +303,12 @@ def az_create_app_insights_account(context, root_name, resource_group):
         '%Y%m%d%I%M%S')
     parameters['appName']['value'] = app_insights_account_name
 
-    try:
-        subprocess.check_output(
-            ['az', 'group', 'deployment', 'create', '-g', resource_group, '-n',
-             deployment_name, '--template-file',
-             template_file, '--parameters', json.dumps(parameters), '--no-wait'],
-            stderr=subprocess.STDOUT)
-    except subprocess.CalledProcessError as exc:
-        if exc.output:
-            result = exc.output.decode('ascii')
-            if 'is not valid according' in result:
-                print(
-                    'App Insights Account provisioning via template failed. This might mean you do not have enough resources in your subscription.')  # pylint: disable=line-too-long
-                s = re.search(r"tracking id is '(?P<tracking_id>.+)'", result)
-                if s:
-                    print('The tracking id is {}.'.format(s.group('tracking_id')))
-                    print(
-                    'You can login to https://portal.azure.com to find more details about this error.')
-
-        raise AzureCliError(
-            'Error creating App Insights Account from template. Error details {}'.format(
-                exc.output.decode('ascii')))
+    properties = DeploymentProperties(template=template, parameters=parameters, mode='incremental')
+    client = client_factory.get_mgmt_service_client(ResourceManagementClient).deployments
+    client.create_or_update(resource_group, deployment_name, properties, raw=True)
 
     print('Started App Insights Account deployment.')
-    print("To check the status of the deployment, run 'aml env setup -s {}'".format(
+    print("To check the status of the deployment, run 'az ml env setup -s {}'".format(
         deployment_name))
 
 
@@ -403,7 +316,7 @@ def az_check_template_deployment_status(deployment_name):
     """
     Check the status of a previously started template deployment.
     :param deployment_name: The name of the deployment.
-    :return: If deployment succeeded, return the dictionary response. If not, display the deployment status.
+    :return: If deployment succeeded, return the response. If not, display the deployment status.
     """
 
     # Log in to Azure if not already logged in
@@ -413,37 +326,9 @@ def az_check_template_deployment_status(deployment_name):
         raise AzureCliError('Not a valid AML deployment name.')
 
     resource_group = deployment_name.split('deployment')[0]
-    try:
-        deployment_status = subprocess.check_output(
-            ['az', 'group', 'deployment', 'show', '-g', resource_group, '-n',
-             deployment_name, '-o', 'json'],
-            stderr=subprocess.STDOUT).decode('ascii')
-    except subprocess.CalledProcessError as exc:
-        raise AzureCliError(
-            'Error retrieving deployment status: {}'.format(exc.output.decode('ascii')))
 
-    try:
-        deployment_status = json.loads(deployment_status)
-    except ValueError:
-        raise AzureCliError(
-            'Malformed deployment status. Please report this to deployml@microsoft.com, with the following in your error report: {}'  # pylint: disable=line-too-long
-                .format(deployment_status))
-
-    if 'properties' not in deployment_status or 'provisioningState' not in \
-            deployment_status['properties']:
-        raise AzureCliError(
-            'Error retrieving deployment status. Returned object from az cli: {}'.format(
-                json.dumps(deployment_status)))
-
-    if deployment_status['properties']['provisioningState'] != 'Succeeded':
-        print('Deployment status: {}'.format(
-            deployment_status['properties']['provisioningState']))
-        return
-
-    return deployment_status
-
-
-def az_throw_malformed_json_error(json_dump):
-    raise AzureCliError(
-        'Malformed json response. Please report this to deployml@microsoft.com with the following output: {}'  # pylint: disable=line-too-long
-            .format(json.dumps(json_dump)))
+    client = client_factory.get_mgmt_service_client(ResourceManagementClient).deployments
+    result = client.get(resource_group, deployment_name)
+    if result.properties.provisioning_state == 'Succeeded':
+        return result
+    print('Deployment status: {}'.format(result.properties.provisioning_state))

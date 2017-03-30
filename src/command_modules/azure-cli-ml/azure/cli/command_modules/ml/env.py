@@ -11,7 +11,6 @@ from .service._realtimeutilities import check_marathon_port_forwarding
 from ._az_util import az_check_template_deployment_status
 from ._az_util import AzureCliError
 from ._az_util import az_get_app_insights_account
-from ._az_util import az_parse_acs_outputs
 from ._az_util import validate_env_name
 from ._az_util import InvalidNameError
 from ._az_util import az_login
@@ -336,7 +335,7 @@ def env_setup(status, name, context=CommandLineInterfaceContext()):
             return
 
         if completed_deployment:
-            if 'appinsights' in completed_deployment['name']:
+            if 'appinsights' in completed_deployment.name:
                 try:
                     (app_insights_account_name, app_insights_account_key) = az_get_app_insights_account(completed_deployment)
                     if app_insights_account_name and app_insights_account_key:
@@ -356,7 +355,8 @@ def env_setup(status, name, context=CommandLineInterfaceContext()):
                     return
             else:
                 try:
-                    (acs_master, acs_agent) = az_parse_acs_outputs(completed_deployment)
+                    acs_master = completed_deployment.properties.outputs['masterFQDN']['value']
+                    acs_agent = completed_deployment.properties.outputs['agentpublicFQDN']['value']
                     if acs_master and acs_agent:
                         print('ACS deployment succeeded.')
                         print('ACS Master URL     : {}'.format(acs_master))
@@ -478,7 +478,7 @@ def env_setup(status, name, context=CommandLineInterfaceContext()):
     try:
         with open(os.path.expanduser('~/.amlenvrc'), 'w+') as env_file:
             env_file.write('\n'.join(env_statements) + '\n')
-        print('You can also find these settings saved in {}'.format(os.path.expanduser('~/.amlenvrc')))
+        print('You can also find these settings saved in {}'.format(os.path.join(os.path.expanduser('~'), '.amlenvrc')))
     except IOError:
         pass
 
