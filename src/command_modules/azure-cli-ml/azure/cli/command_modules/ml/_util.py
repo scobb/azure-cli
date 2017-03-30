@@ -13,6 +13,7 @@ import os
 import json
 import sys
 import platform
+import socket
 from datetime import datetime, timedelta
 
 try:
@@ -222,6 +223,14 @@ class CommandLineInterfaceContext(object):
     @staticmethod
     def get_input(input_str):
         return input(input_str)
+
+    @staticmethod
+    def get_socket(inet, stream):
+        return socket.socket(inet, stream)
+
+    @staticmethod
+    def check_call(cmd, **kwargs):
+        return subprocess.check_call(cmd, **kwargs)
 
 
 # UTILITY FUNCTIONS
