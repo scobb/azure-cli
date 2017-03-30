@@ -258,6 +258,8 @@ def env_describe(context=CommandLineInterfaceContext()):
     print('ACR URL                : {}'.format(context.acr_home))
     print('ACR username           : {}'.format(context.acr_user))
     print('ACR password           : {}'.format(context.acr_pw))
+    print('App Insights account   : {}'.format(context.app_insights_account_name))
+    print('App Insights key       : {}'.format(context.app_insights_account_key))
 
     if not context.in_local_mode():
         print('HDI cluster URL        : {}'.format(context.hdi_home))
