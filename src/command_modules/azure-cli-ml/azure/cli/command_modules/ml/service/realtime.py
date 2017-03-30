@@ -28,6 +28,7 @@ import tabulate
 from azure.storage.blob import (BlockBlobService, ContentSettings, BlobPermissions)
 
 from .._util import cli_context
+from .._util import get_json
 from .._util import is_int
 from .._util import ice_connection_timeout
 
@@ -399,9 +400,9 @@ def realtime_service_create(score_file, dependencies, requirements, schema_file,
 
     verbose = verb
     if logging_level == 'none':
-        app_insights_enabled = False
+        app_insights_enabled = 'false'
     else:
-        app_insights_enabled = True
+        app_insights_enabled = 'true'
 
     if (score_file == '' or
         service_name == '' or
@@ -655,11 +656,11 @@ def realtime_service_create(score_file, dependencies, requirements, schema_file,
         realtime_service_deploy_local(context, image, verbose, app_insights_enabled, logging_level)
         exit()
     else:
-        realtime_service_deploy(context, image, service_name, app_insights_enabled, logging_level)
+        realtime_service_deploy(context, image, service_name, app_insights_enabled, logging_level, verbose)
         return
 
 
-def realtime_service_deploy(context, image, app_id):
+def realtime_service_deploy(context, image, app_id, app_insights_enabled, logging_level, verbose):
     """Deploy a realtime web service from a docker image."""
 
     marathon_app = resource_string(__name__, 'data/marathon.json')
@@ -667,7 +668,14 @@ def realtime_service_deploy(context, image, app_id):
     marathon_app['container']['docker']['image'] = image
     marathon_app['labels']['HAPROXY_0_VHOST'] = context.acs_agent_url
     marathon_app['labels']['AMLID'] = app_id
+    marathon_app['env']['AML_APP_INSIGHTS_KEY'] = context.app_insights_account_key
+    marathon_app['env']['AML_APP_INSIGHTS_ENABLED'] = app_insights_enabled
+    marathon_app['env']['AML_CONSOLE_LOG'] = logging_level
     marathon_app['id'] = app_id
+
+    if verbose:
+        print('Marathon payload: {}'.format(marathon_app))
+
     headers = {'Content-Type': 'application/json'}
     marathon_base_url = resolve_marathon_base_url(context)
     marathon_url = marathon_base_url + '/marathon/v2/apps'
@@ -683,13 +691,14 @@ def realtime_service_deploy(context, image, app_id):
         print('For more information about setting up your environment, see: "aml env about".')
         return
 
-    if deploy_result.status_code != 200:
-        print('Error creating service.')
-        print(deploy_result.content)
+    try:
+        deploy_result.raise_for_status()
+    except requests.exceptions.HTTPError as ex:
+        print('Error creating service: {}'.format(ex))
         return
 
     try:
-        deploy_result = deploy_result.json()
+        deploy_result = get_json(deploy_result.content)
     except ValueError:
         print('Error creating service.')
         print(deploy_result.content)

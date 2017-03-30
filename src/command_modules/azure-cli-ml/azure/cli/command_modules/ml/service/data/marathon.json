@@ -39,6 +39,11 @@
   "cpus": 0.1,
   "instances": 1,
   "id": "magicdemo",
+  "env": {
+    "AML_APP_INSIGHTS_KEY": "",
+    "AML_APP_INSIGHTS_ENABLED": "false",
+    "AML_CONSOLE_LOG": "debug"
+  },
   "uris":
     [
       "file:///opt/aml/docker.tar.gz"
