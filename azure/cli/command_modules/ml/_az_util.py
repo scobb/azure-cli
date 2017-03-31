@@ -279,12 +279,11 @@ def az_get_app_insights_account(completed_deployment):
     return resource_name, result.properties['InstrumentationKey']
 
 
-def az_create_app_insights_account(context, root_name, resource_group):
+def az_create_app_insights_account(root_name, resource_group):
     """
     Creates an App Insights Account using the Azure CLI and our ARM template.
     It assumes that the user is already logged in to Azure, and
     that the Azure CLI (az) is present on the system.
-    :param context: CommandLineInterfaceContext object
     :param root_name: The name to use as a prefix for the app insights account
     :param resource_group: The resource group in which to create the app insights account
     :param salt: An optional salt to append to the app insights account name
