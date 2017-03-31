@@ -443,10 +443,10 @@ def env_setup(status, name, context=CommandLineInterfaceContext()):
         if answer != 'y' and answer != 'yes':
             print('Continuing with configured app insights account.')
         else:
-            az_create_app_insights_account(context, root_name, resource_group)
+            az_create_app_insights_account(root_name, resource_group)
 
     else:
-        az_create_app_insights_account(context, root_name, resource_group)
+        az_create_app_insights_account(root_name, resource_group)
 
     if context.acs_master_url and context.acs_agent_url:
         print('Found existing ACS setup:')
