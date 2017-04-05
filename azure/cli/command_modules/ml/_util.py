@@ -233,6 +233,15 @@ class CommandLineInterfaceContext(object):
         return subprocess.check_call(cmd, **kwargs)
 
 
+class JupyterContext(CommandLineInterfaceContext):
+    def __init__(self):
+        super(JupyterContext, self).__init__()
+        self.local_mode = True
+
+    def in_local_mode(self):
+        return self.local_mode
+
+
 # UTILITY FUNCTIONS
 def get_json(payload):
     """
@@ -686,7 +695,6 @@ class ConditionalListTraversalFunction(TraversalFunction):
         return ', '.join([self.action(item) for item in json_list if self.condition(item)])
 
 
-
 def is_int(int_str):
     """
 
@@ -699,3 +707,24 @@ def is_int(int_str):
         return True
     except ValueError:
         return False
+
+
+def create_ssh_key_if_not_exists():
+    from ._az_util import AzureCliError
+    if not os.path.exists(os.path.join(os.path.expanduser('~'), '.ssh', 'id_rsa')):
+        try:
+            subprocess.check_call(['ssh-keygen', '-t', 'rsa', '-b', '2048', '-f', os.path.expanduser('~/.ssh/id_rsa')])
+        except subprocess.CalledProcessError:
+            print('Failed to set up sh key pair. Aborting environment setup.')
+            raise AzureCliError('')
+
+    try:
+        with open(os.path.expanduser('~/.ssh/id_rsa.pub'), 'r') as sshkeyfile:
+            ssh_public_key = sshkeyfile.read().rstrip()
+    except IOError:
+        print('Could not load your SSH public key from {}'.format(
+            os.path.expanduser('~/.ssh/id_rsa.pub')))
+        print('Please run az ml env setup again to create a new ssh keypair.')
+        raise AzureCliError('')
+
+    return ssh_public_key
