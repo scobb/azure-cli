@@ -6,6 +6,7 @@ import platform
 from builtins import input
 from ._util import CommandLineInterfaceContext
 from ._util import acs_connection_timeout
+from ._util import create_ssh_key_if_not_exists
 from ._util import InvalidConfError
 from .service._realtimeutilities import check_marathon_port_forwarding
 from ._az_util import az_check_template_deployment_status
@@ -376,20 +377,12 @@ def env_setup(status, name, context=CommandLineInterfaceContext()):
                     return
 
         return
-    if not os.path.exists(os.path.expanduser('~/.ssh/id_rsa')):
-        print('Setting up ssh key pair')
-        try:
-            subprocess.check_call(['ssh-keygen', '-t', 'rsa', '-b', '2048', '-f', os.path.expanduser('~/.ssh/id_rsa')])
-        except subprocess.CalledProcessError:
-            print('Failed to set up sh key pair. Aborting environment setup.')
 
     try:
-        with open(os.path.expanduser('~/.ssh/id_rsa.pub'), 'r') as sshkeyfile:
-            ssh_public_key = sshkeyfile.read().rstrip()
-    except IOError:
-        print('Could not load your SSH public key from {}'.format(os.path.expanduser('~/.ssh/id_rsa.pub')))
-        print('Please run az ml env setup again to create a new ssh keypair.')
+        ssh_public_key = create_ssh_key_if_not_exists()
+    except AzureCliError:
         return
+
     print('Setting up your Azure ML environment with a storage account, App Insights account, ACR registry and ACS cluster.')
     if not name:
         root_name = input('Enter environment name (1-20 characters, lowercase alphanumeric): ')
