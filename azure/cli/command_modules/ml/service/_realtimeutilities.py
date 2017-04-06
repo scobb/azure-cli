@@ -141,7 +141,7 @@ def get_sample_data(sample_url, headers, verbose):
         print('[Debug] Fetching sample data from: {}'.format(sample_url))
     try:
         sample_data = requests.get(sample_url, headers=headers)
-    except (requests.ConnectionError, requests.ConnectTimeout):
+    except requests.ConnectionError:
         if verbose:
             print('[Debug] Could not connect to sample data endpoint on this container.')
         return default_retval

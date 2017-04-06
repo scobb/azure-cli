@@ -237,6 +237,7 @@ def realtime_service_run_local(service_name, input_data, verbose):
 # Cluster mode functions
 
 
+# TODO - not yet used
 def realtime_service_scale(context, args):
     """Scale a published realtime web service."""
 
@@ -413,7 +414,6 @@ def realtime_service_create(score_file, dependencies, requirements, schema_file,
     storage_exists = False
     acs_exists = False
     acr_exists = False
-    ice_key = None
 
     if context.az_account_name is None or context.az_account_key is None:
         print("")
@@ -540,6 +540,7 @@ def realtime_service_create(score_file, dependencies, requirements, schema_file,
 
     if verbose:
         print(code)
+
     az_container_name = 'amlbdpackages'
     az_blob_name = str(uuid.uuid4()) + '.py'
     bbs = BlockBlobService(account_name=context.az_account_name,
@@ -601,7 +602,7 @@ def realtime_service_create(score_file, dependencies, requirements, schema_file,
     try:
         ice_put_result = requests.put(
             create_url, headers=headers, data=json.dumps(json_payload), timeout=ice_connection_timeout)
-    except (requests.ConnectionError, requests.ConnectTimeout, requests.exceptions.ReadTimeout):
+    except (requests.ConnectionError, requests.exceptions.ReadTimeout):
         print('Error: could not connect to Azure ML. Please try again later. If the problem persists, please contact deployml@microsoft.com') #pylint: disable=line-too-long
         return
 
@@ -654,10 +655,8 @@ def realtime_service_create(score_file, dependencies, requirements, schema_file,
     print('Image available at : {}'.format(acs_payload['container']['docker']['image']))
     if context.in_local_mode():
         realtime_service_deploy_local(context, image, verbose, app_insights_enabled, logging_level)
-        exit()
     else:
         realtime_service_deploy(context, image, service_name, app_insights_enabled, logging_level, verbose)
-        return
 
 
 def realtime_service_deploy(context, image, app_id, app_insights_enabled, logging_level, verbose):
@@ -682,7 +681,7 @@ def realtime_service_deploy(context, image, app_id, app_insights_enabled, loggin
     try:
         deploy_result = requests.put(
             marathon_url + '/' + app_id, headers=headers, data=json.dumps(marathon_app), verify=False)
-    except requests.ConnectTimeout:
+    except requests.exceptions.ConnectTimeout:
         print('Error: timed out trying to establish a connection to ACS. Please check that your ACS is up and healthy.')
         print('For more information about setting up your environment, see: "aml env about".')
         return
@@ -781,6 +780,10 @@ def realtime_service_view(service_name=None, verb=False, context=cli_context):
             sample_url = 'http://' + context.acs_agent_url + ':9091/sample'
             headers = {'Content-Type': 'application/json', 'X-Marathon-App-Id': "/{}".format(service_name)}
             usage_headers.append('-H "X-Marathon-App-Id:/{}"'.format(service_name))
+        else:
+            print('Unable to determine ACS Agent URL. '
+                  'Please ensure that AML_ACS_AGENT environment variable is set.')
+            return
 
     service_sample_data = get_sample_data(sample_url, headers, verbose)
     sample_data = '{{"input":"{}"}}'.format(
@@ -788,8 +791,6 @@ def realtime_service_view(service_name=None, verb=False, context=cli_context):
     print('Usage:')
     print('  aml  : aml service run realtime -n {} [-d \'{}\']'.format(service_name, sample_data))
     print('  curl : curl -X POST {} --data \'{}\' {}'.format(' '.join(usage_headers), sample_data, scoring_url))
-
-    return
 
 
 def realtime_service_list(service_name=None, verb=False, context=cli_context):
@@ -876,7 +877,7 @@ def realtime_service_list(service_name=None, verb=False, context=cli_context):
         print(marathon_url)
     try:
         list_result = requests.get(marathon_url)
-    except (requests.ConnectionError, requests.ConnectTimeout):
+    except requests.ConnectionError:
         print('Error connecting to ACS. Please check that your ACS cluster is up and healthy.')
         return
     try:
@@ -958,7 +959,6 @@ def realtime_service_run_cluster(context, service_name, input_data, verbose):
         return
 
     print(result['result'])
-    return
 
 
 def realtime_service_run(service_name, input_data, verb, context=cli_context):
@@ -975,7 +975,6 @@ def realtime_service_run(service_name, input_data, verb, context=cli_context):
 
     if context.in_local_mode():
         realtime_service_run_local(service_name, input_data, verbose)
-        return
     else:
         realtime_service_run_cluster(context, service_name, input_data, verbose)
 
