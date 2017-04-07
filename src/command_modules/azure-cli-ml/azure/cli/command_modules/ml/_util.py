@@ -260,9 +260,16 @@ class JupyterContext(CommandLineInterfaceContext):
     def __init__(self):
         super(JupyterContext, self).__init__()
         self.local_mode = True
+        self.input_response = {}
 
     def in_local_mode(self):
         return self.local_mode
+
+    def set_input_response(self, prompt, response):
+        self.input_response[prompt] = response
+
+    def get_input(self, prompt):
+        return self.input_response[prompt]
 
 
 # UTILITY FUNCTIONS

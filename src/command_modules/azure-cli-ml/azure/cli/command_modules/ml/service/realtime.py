@@ -136,17 +136,18 @@ def realtime_service_deploy_local(context, image, verbose, app_insights_enabled,
     if is_int(existing_container_port) and int(existing_container_port) > 0:
         print('Found existing local service with the same name running at http://127.0.0.1:{}/score'
               .format(existing_container_port))
-        answer = input('Delete existing service and create new service (y/N)? ')
+        answer = context.get_input('Delete existing service and create new service (y/N)? ')
         answer = answer.rstrip().lower()
         if answer != 'y' and answer != 'yes':
             print('Canceling service create.')
-            return
+            return 1
         realtime_service_delete_local(service_label, verbose)
 
     # Check if credentials to the ACR are already configured in ~/.docker/config.json
     check_docker_credentials(context.acr_home, context.acr_user, context.acr_pw, verbose)
 
     try:
+        subprocess.check_call(['docker', 'pull', image])
         docker_output = subprocess.check_output(
             ["docker", "run", "-e", "AML_APP_INSIGHTS_KEY={}".format(context.app_insights_account_key),
                               "-e", "AML_APP_INSIGHTS_ENABLED={}".format(app_insights_enabled),
@@ -654,7 +655,7 @@ def realtime_service_create(score_file, dependencies, requirements, schema_file,
     print('done.')
     print('Image available at : {}'.format(acs_payload['container']['docker']['image']))
     if context.in_local_mode():
-        realtime_service_deploy_local(context, image, verbose, app_insights_enabled, logging_level)
+        return realtime_service_deploy_local(context, image, verbose, app_insights_enabled, logging_level)
     else:
         realtime_service_deploy(context, image, service_name, app_insights_enabled, logging_level, verbose)
 
