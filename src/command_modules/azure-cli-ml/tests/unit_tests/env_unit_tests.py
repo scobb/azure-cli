@@ -34,7 +34,7 @@ class EnvUnitTests(unittest.TestCase):
     rsa_private = os.path.join(ssh_folder, 'id_rsa')
     rsa_public = rsa_private + '.pub'
     env_describe_local_string = ('** Warning: Running in local mode. **\n'
-                                 'To switch to cluster mode: aml env cluster\n\n'
+                                 'To switch to cluster mode: az ml env cluster\n\n'
                                  'Storage account name   : None\n'
                                  'Storage account key    : None\n'
                                  'ACR URL                : None\n'
@@ -89,7 +89,7 @@ class EnvUnitTests(unittest.TestCase):
         if not hasattr(sys.stdout, "getvalue"):
             self.fail("need to run in buffered mode")
         output = sys.stdout.getvalue().strip()
-        self.assertEqual(output, 'aml env local [-v]')
+        self.assertEqual(output, 'az ml env local [-v]')
 
     def test_env_local_windows(self):
         context = TestContext()
@@ -622,7 +622,7 @@ class EnvUnitTests(unittest.TestCase):
         self.assertEqual(output,
                          'Trying direct connection to ACS cluster at http://test.master.com/marathon/v2\n'
                          'Marathon endpoint not available at http://test.master.com/marathon/v2\n'
-                         "Aborting switch to cluster mode. Please run 'aml env about' for more information on setting up your cluster.")
+                         "Aborting switch to cluster mode. Please run 'az ml env about' for more information on setting up your cluster.")
         conf = context.read_config()
         self.assertFalse('mode' in conf)
 
@@ -674,7 +674,7 @@ class EnvUnitTests(unittest.TestCase):
                                  " set AML_ACS_MASTER=test.acs.master\n"
                                  " set AML_ACS_AGENT=test.acs.agent\n"
                                  "You can also find these settings saved in {}\n\nTo "
-                                 "switch to cluster mode, run 'aml env "
+                                 "switch to cluster mode, run 'az ml env "
                                  "cluster'.".format(self.amlenvrc_path))
 
     @patch('azure.cli.command_modules.ml.env.az_check_acs_status')
@@ -1008,7 +1008,7 @@ class EnvUnitTests(unittest.TestCase):
         output = sys.stdout.getvalue().strip()
         self.assertEqual(output, "Setting up ssh key pair\n"
                                  "Could not load your SSH public key from {}\n"
-                                 "Please run aml env setup again to create a new ssh keypair.".format(
+                                 "Please run az ml env setup again to create a new ssh keypair.".format(
             self.rsa_public))
 
     @patch('azure.cli.command_modules.ml.env.os.path.exists')
@@ -1080,7 +1080,7 @@ class EnvUnitTests(unittest.TestCase):
                                  " export AML_ACS_AGENT=test.agent\n"
                                  "You can also find these settings saved in {}\n"
                                  "\n"
-                                 "To switch to cluster mode, run 'aml env cluster'.".format(
+                                 "To switch to cluster mode, run 'az ml env cluster'.".format(
             self.amlenvrc_path))
 
     def test_report_acs_success_windows(self):
@@ -1111,7 +1111,7 @@ class EnvUnitTests(unittest.TestCase):
                                  " set AML_ACS_AGENT=test.agent\n"
                                  "You can also find these settings saved in {}\n"
                                  "\n"
-                                 "To switch to cluster mode, run 'aml env cluster'.".format(
+                                 "To switch to cluster mode, run 'az ml env cluster'.".format(
             self.amlenvrc_path))
 
     def test_report_acs_success_linux_IOError(self):
@@ -1136,50 +1136,8 @@ class EnvUnitTests(unittest.TestCase):
                                  " export AML_ACS_MASTER=test.master\n"
                                  " export AML_ACS_AGENT=test.agent\n"
                                  "\n"
-                                 "To switch to cluster mode, run 'aml env cluster'.".format(
+                                 "To switch to cluster mode, run 'az ml env cluster'.".format(
             self.amlenvrc_path))
-
-    @patch('azure.cli.command_modules.ml.env.env_local')
-    def test_env_switching_logic_local(self, env_local_mock):
-        c = TestContext()
-        c.set_args(['aml', 'env', 'local'])
-        env(c)
-        env_local_mock.assert_called_once_with(c, [])
-
-    @patch('azure.cli.command_modules.ml.env.env_about')
-    def test_env_switching_logic_about(self, env_about_mock):
-        c = TestContext()
-        c.set_args(['aml', 'env', 'about'])
-        env(c)
-        env_about_mock.assert_called_once_with()
-
-    @patch('azure.cli.command_modules.ml.env.env_cluster')
-    def test_env_switching_logic_cluster(self, env_cluster_mock):
-        c = TestContext()
-        c.set_args(['aml', 'env', 'cluster'])
-        env(c)
-        env_cluster_mock.assert_called_once_with(c, [])
-
-    @patch('azure.cli.command_modules.ml.env.env_describe')
-    def test_env_switching_logic_show(self, env_describe_mock):
-        c = TestContext()
-        c.set_args(['aml', 'env', 'show'])
-        env(c)
-        env_describe_mock.assert_called_once_with(c)
-
-    @patch('azure.cli.command_modules.ml.env.env_setup')
-    def test_env_switching_logic_setup(self, env_setup_mock):
-        c = TestContext()
-        c.set_args(['aml', 'env', 'setup'])
-        env(c)
-        env_setup_mock.assert_called_once_with(c, [])
-
-    @patch('azure.cli.command_modules.ml.env.env_usage')
-    def test_env_switching_logic_unhappy(self, env_usage_mock):
-        c = TestContext()
-        c.set_args(['aml', 'env', 'trash'])
-        env(c)
-        env_usage_mock.assert_called_once_with()
 
 
 if __name__ == '__main__':

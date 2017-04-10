@@ -56,7 +56,7 @@ def realtime_service_delete_local(service_name, verbose):
 
     if dockerps_output is None or len(dockerps_output) == 0:
         print("[Local mode] Error: no service named {} running locally.".format(service_name))
-        print("[Local mode] To delete a cluster based service, switch to remote mode first: aml env remote")
+        print("[Local mode] To delete a cluster based service, switch to remote mode first: az ml env remote")
         return
 
     if len(dockerps_output) != 1:
@@ -175,7 +175,7 @@ def realtime_service_deploy_local(context, image, verbose, app_insights_enabled,
             .format(sample_data_available if sample_data_available else '!! YOUR DATA HERE !!')
         print("[Local mode] Success.")
         print('[Local mode] Scoring endpoint: http://127.0.0.1:{}/score'.format(dockerport))
-        print("[Local mode] Usage: aml service run realtime -n " + service_label + " [-d {}]".format(input_data))
+        print("[Local mode] Usage: az ml service run realtime -n " + service_label + " [-d {}]".format(input_data))
         return
     else:
         print("[Local mode] Error creating local web service. Docker failed with:")
@@ -190,7 +190,7 @@ def realtime_service_run_local(service_name, input_data, verbose):
     container_port = get_local_realtime_service_port(service_name, verbose)
     if is_int(container_port) and int(container_port) < 0:
         print("[Local mode] No service named {} running locally.".format(service_name))
-        print("To run a remote service, switch environments using: aml env remote")
+        print("To run a remote service, switch environments using: az ml env remote")
         return
     else:
         headers = {'Content-Type': 'application/json'}
@@ -201,7 +201,7 @@ def realtime_service_run_local(service_name, input_data, verbose):
             input_data = '{{"input":"{}"}}'.format(sample_data)
             if not sample_data:
                 print(
-                    "No sample data available. To score with your own data, run: aml service run realtime -n {} -d <input_data>" #pylint: disable=line-too-long
+                    "No sample data available. To score with your own data, run: az ml service run realtime -n {} -d <input_data>" #pylint: disable=line-too-long
                     .format(service_name))
                 return
             print('Using sample data: ' + input_data)
@@ -244,7 +244,7 @@ def realtime_service_scale(context, args):
 
     if context.in_local_mode():
         print("Error: Scaling is not supported in local mode.")
-        print("To scale a cluster based service, switch to cluster mode first: aml env cluster")
+        print("To scale a cluster based service, switch to cluster mode first: az ml env cluster")
         return
 
     service_name = ''
@@ -253,7 +253,7 @@ def realtime_service_scale(context, args):
     try:
         opts, args = getopt.getopt(args, "n:c:")
     except getopt.GetoptError:
-        print("aml service scale realtime -n <service name> -c <instance_count>")
+        print("az ml service scale realtime -n <service name> -c <instance_count>")
         return
 
     for opt, arg in opts:
@@ -264,12 +264,12 @@ def realtime_service_scale(context, args):
 
     if service_name == '':
         print("Error: missing service name.")
-        print("aml service scale realtime -n <service name> -c <instance_count>")
+        print("az ml service scale realtime -n <service name> -c <instance_count>")
         return
 
     if instance_count == 0 or instance_count > 5:
         print("Error: instance count must be between 1 and 5.")
-        print("To delete a service, use: aml service delete")
+        print("To delete a service, use: az ml service delete")
         return
 
     headers = {'Content-Type': 'application/json'}
@@ -338,7 +338,7 @@ def realtime_service_delete(service_name, verb, context=cli_context):
 
     if context.acs_master_url is None:
         print("")
-        print("Please set up your ACS cluster for AML. See 'aml env about' for more information.")
+        print("Please set up your ACS cluster for AML. See 'az ml env about' for more information.")
         return
 
     response = input("Permanently delete service {} (y/N)? ".format(service_name))
@@ -353,11 +353,11 @@ def realtime_service_delete(service_name, verb, context=cli_context):
         delete_result = requests.delete(marathon_url + '/' + service_name, headers=headers, verify=False)
     except requests.ConnectTimeout:
         print('Error: timed out trying to establish a connection to ACS. Please check that your ACS is up and healthy.')
-        print('For more information about setting up your environment, see: "aml env about".')
+        print('For more information about setting up your environment, see: "az ml env about".')
         return
     except requests.ConnectionError:
         print('Error: Could not establish a connection to ACS. Please check that your ACS is up and healthy.')
-        print('For more information about setting up your environment, see: "aml env about".')
+        print('For more information about setting up your environment, see: "az ml env about".')
         return
 
     if delete_result.status_code != 200:
@@ -608,7 +608,7 @@ def realtime_service_create(score_file, dependencies, requirements, schema_file,
         return
 
     if ice_put_result.status_code == 401:
-        print("Invalid API key. Please update your key by running 'aml env key -u'.")
+        print("Invalid API key. Please update your key by running 'az ml env key -u'.")
         return
     elif ice_put_result.status_code != 201:
         print('Error connecting to Azure ML. Please contact deployml@microsoft.com with the stack below.')
@@ -684,11 +684,11 @@ def realtime_service_deploy(context, image, app_id, app_insights_enabled, loggin
             marathon_url + '/' + app_id, headers=headers, data=json.dumps(marathon_app), verify=False)
     except requests.exceptions.ConnectTimeout:
         print('Error: timed out trying to establish a connection to ACS. Please check that your ACS is up and healthy.')
-        print('For more information about setting up your environment, see: "aml env about".')
+        print('For more information about setting up your environment, see: "az ml env about".')
         return
     except requests.ConnectionError:
         print('Error: Could not establish a connection to ACS. Please check that your ACS is up and healthy.')
-        print('For more information about setting up your environment, see: "aml env about".')
+        print('For more information about setting up your environment, see: "az ml env about".')
         return
 
     try:
@@ -714,7 +714,7 @@ def realtime_service_deploy(context, image, app_id, app_insights_enabled, loggin
         m_app = m_app.json()
 
     print("Success.")
-    print("Usage: aml service run realtime -n " + app_id + " [-d '{\"input\" : \"!! YOUR DATA HERE !!\"}']")
+    print("Usage: az ml service run realtime -n " + app_id + " [-d '{\"input\" : \"!! YOUR DATA HERE !!\"}']")
     return
 
 
@@ -790,7 +790,7 @@ def realtime_service_view(service_name=None, verb=False, context=cli_context):
     sample_data = '{{"input":"{}"}}'.format(
         service_sample_data if service_sample_data is not None else default_sample_data)
     print('Usage:')
-    print('  aml  : aml service run realtime -n {} [-d \'{}\']'.format(service_name, sample_data))
+    print('  az ml  : az ml service run realtime -n {} [-d \'{}\']'.format(service_name, sample_data))
     print('  curl : curl -X POST {} --data \'{}\' {}'.format(' '.join(usage_headers), sample_data, scoring_url))
 
 
@@ -920,7 +920,7 @@ def realtime_service_run_cluster(context, service_name, input_data, verbose):
 
     if context.acs_agent_url is None:
         print("")
-        print("Please set up your ACS cluster for AML. Run 'aml env about' for help on setting up your environment.")
+        print("Please set up your ACS cluster for AML. Run 'az ml env about' for help on setting up your environment.")
         print("")
         return
 
@@ -935,7 +935,7 @@ def realtime_service_run_cluster(context, service_name, input_data, verbose):
             return
         elif sample_data == '':
             print(
-                "No sample data available. To score with your own data, run: aml service run realtime -n {} -d <input_data>" #pylint: disable=line-too-long
+                "No sample data available. To score with your own data, run: az ml service run realtime -n {} -d <input_data>" #pylint: disable=line-too-long
                 .format(service_name))
             return
 

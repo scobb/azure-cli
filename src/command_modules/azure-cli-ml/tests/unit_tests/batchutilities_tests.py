@@ -285,7 +285,7 @@ class BatchUtilitiesTests(unittest.TestCase):
             self.fail("need to run in buffered mode")
         output = sys.stdout.getvalue().strip()
         self.assertEqual(output, 'Environment is missing the following variables:\n  AML_HDI_CLUSTER\n  '
-                                 'AML_HDI_USER\n  AML_HDI_PW\nFor help setting up environment, run\n  aml env about')
+                                 'AML_HDI_USER\n  AML_HDI_PW\nFor help setting up environment, run\n  az ml env about')
 
     def test_batch_env_is_valid_local_happy(self):
         context = TestContext()
@@ -343,7 +343,7 @@ class BatchUtilitiesTests(unittest.TestCase):
         output = sys.stdout.getvalue().strip()
         self.assertEqual(output, 'Authentication failed on https://testdomain-aml.apps.azurehdinsight.net. '
                                  'Check your AML_HDI_USER and AML_HDI_PW environment variables.\n'
-                                 'For help setting up environment, run\n  aml env about')
+                                 'For help setting up environment, run\n  az ml env about')
 
     def test_batch_env_is_valid_remote_503(self):
         context = TestContext()
@@ -459,7 +459,7 @@ class BatchUtilitiesTests(unittest.TestCase):
             self.fail("need to run in buffered mode")
         output = sys.stdout.getvalue().strip()
         self.assertEqual(output, 'Environment is missing the following variables:\n  AML_STORAGE_ACCT_NAME\n  '
-                                 'AML_STORAGE_ACCT_KEY.\nFor help setting up environment, run\n  aml env about')
+                                 'AML_STORAGE_ACCT_KEY.\nFor help setting up environment, run\n  az ml env about')
 
     def test_batch_env_and_storage_are_valid_exc(self):
         context = TestContext()

@@ -25,7 +25,7 @@ from .._util import is_int
 class RealtimeConstants(object):
     supported_runtimes = ['spark-py', 'cntk-py', 'tensorflow-py', 'scikit-py']
     supported_logging_levels = ['none', 'info', 'debug', 'warn', 'trace']
-    create_cmd_sample = "aml service create realtime -f <webservice file> -n <service name> [-m <model1> [-m <model2>] ...] [-p requirements.txt] [-s <schema>] [-r {0}] [-l {1}]".format("|".join(supported_runtimes), "|".join(supported_logging_levels))  # pylint: disable=line-too-long
+    create_cmd_sample = "az ml service create realtime -f <webservice file> -n <service name> [-m <model1> [-m <model2>] ...] [-p requirements.txt] [-s <schema>] [-r {0}] [-l {1}]".format("|".join(supported_runtimes), "|".join(supported_logging_levels))  # pylint: disable=line-too-long
 
 
 def upload_dependency(context, dependency, verbose):
@@ -122,7 +122,7 @@ def resolve_marathon_base_url(context):
             marathon_base_url = 'http://' + cluster
         else:
             print("")
-            print("No valid ACS found. Please run 'aml env about' for instructions on setting up your environment.")
+            print("No valid ACS found. Please run 'az ml env about' for instructions on setting up your environment.")
             print("")
 
     return marathon_base_url

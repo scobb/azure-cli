@@ -594,7 +594,7 @@ class BatchUnitTests(unittest.TestCase):
                                  '  AML_HDI_USER\n'
                                  '  AML_HDI_PW\n'
                                  'For help setting up environment, run\n'
-                                 '  aml env about')
+                                 '  az ml env about')
 
     def test_batch_service_view_local_400(self):
         context = TestContext()
@@ -744,7 +744,7 @@ class BatchUnitTests(unittest.TestCase):
                                  '  AML_HDI_USER\n'
                                  '  AML_HDI_PW\n'
                                  'For help setting up environment, run\n'
-                                 '  aml env about')
+                                 '  az ml env about')
 
     def test_batch_service_list_remote(self):
         context = TestContext()
@@ -897,7 +897,7 @@ class BatchUnitTests(unittest.TestCase):
                                  '  AML_HDI_USER\n'
                                  '  AML_HDI_PW\n'
                                  'For help setting up environment, run\n'
-                                 '  aml env about')
+                                 '  az ml env about')
 
     def test_batch_list_jobs_remote_happy(self):
         context = TestContext()
@@ -989,7 +989,7 @@ class BatchUnitTests(unittest.TestCase):
                                  '  AML_HDI_USER\n'
                                  '  AML_HDI_PW\n'
                                  'For help setting up environment, run\n'
-                                 '  aml env about')
+                                 '  az ml env about')
 
     def test_batch_cancel_job_happy(self):
         context = TestContext()
