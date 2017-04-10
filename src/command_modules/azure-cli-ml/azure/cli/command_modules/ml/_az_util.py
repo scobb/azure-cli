@@ -173,30 +173,26 @@ def get_acr_api_version():
     return az_config.get('acr', 'apiversion', None)
 
 
-def az_create_acr(root_name, resource_group, storage_account_name):
+def az_create_storage_and_acr(root_name, resource_group):
     """
     Create an ACR registry using the Azure CLI (az).
     :param root_name: The prefix to attach to the ACR name.
     :param resource_group: The resource group in which to create the ACR.
-    :param storage_account_name: The storage account to use for the ACR.
-    :return: Tuple - the ACR login server, username, and password
+    :return: Tuple - the ACR login server, username, and password, storage_name, storage_key
     """
     arm_client = client_factory.get_mgmt_service_client(ResourceManagementClient)
     location = arm_client.resource_groups.get(resource_group).location
     acr_name = root_name + 'acr'
-    logger.info(
-    'Creating ACR registry: {} (please be patient, this can take several minutes)'.format(
+    storage_account_name = root_name + 'stor'
+
+    print('Creating ACR registry: {} (please be patient, this can take several minutes)'.format(
         acr_name))
-    storage_client = client_factory.get_mgmt_service_client(StorageManagementClient).storage_accounts
-    storage_account = storage_client.get_properties(resource_group, storage_account_name)
-    storage_account_rg = get_resource_group_name_by_resource_id(storage_account.id)
     parameters = {
         'registryName': {'value': acr_name},
         'registryLocation': {'value': location},
         'registrySku': {'value': 'Basic'},
         'adminUserEnabled': {'value': True},
-        'storageAccountName': {'value': storage_account_name},
-        'storageAccountResourceGroup': {'value': storage_account_rg}
+        'storageAccountName': {'value': storage_account_name}
     }
     custom_api_version = get_acr_api_version()
     if custom_api_version:
@@ -211,6 +207,10 @@ def az_create_acr(root_name, resource_group, storage_account_name):
     # deploy via template
     LongRunningOperation()(deployment_client.create_or_update(resource_group, deployment_name, properties))
 
+    # fetch finished storage and keys
+    storage_client = client_factory.get_mgmt_service_client(StorageManagementClient).storage_accounts
+    keys = storage_client.list_keys(resource_group, storage_account_name).keys
+
     # fetch finished registry and credentials
     if custom_api_version:
         acr_client = client_factory.get_mgmt_service_client(ContainerRegistryManagementClient,
@@ -219,7 +219,7 @@ def az_create_acr(root_name, resource_group, storage_account_name):
         acr_client = client_factory.get_mgmt_service_client(ContainerRegistryManagementClient).registries
     registry = acr_client.get(resource_group, acr_name)
     acr_creds = acr_client.list_credentials(resource_group, acr_name)
-    return registry.login_server, acr_creds.username, acr_creds.passwords[0].value
+    return registry.login_server, acr_creds.username, acr_creds.passwords[0].value, storage_account_name, keys[0].value
 
 
 def az_create_acs(root_name, resource_group, acr_login_server, acr_username,
@@ -319,8 +319,7 @@ def az_create_app_insights_account(root_name, resource_group):
     client.create_or_update(resource_group, deployment_name, properties, raw=True)
 
     print('Started App Insights Account deployment.')
-    print("To check the status of the deployment, run 'az ml env setup -s {}'".format(
-        deployment_name))
+    return deployment_name
 
 
 def az_check_template_deployment_status(deployment_name):
