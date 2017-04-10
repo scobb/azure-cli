@@ -247,7 +247,7 @@ def az_create_acs(root_name, resource_group, acr_login_server, acr_username,
     print(
     'Started ACS deployment. Please note that it can take up to 15 minutes to complete the deployment.')
     print(
-    'You can continue to work with aml in local mode while the ACS is being provisioned.')
+    'You can continue to work with az ml in local mode while the ACS is being provisioned.')
     print("To check the status of the deployment, run 'az ml env setup -s {}'".format(
         deployment_name))
 

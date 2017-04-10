@@ -345,7 +345,7 @@ def env_setup(status, name, context=CommandLineInterfaceContext()):
                         print('App Insights account deployment succeeded.')
                         print('App Insights account name     : {}'.format(app_insights_account_name))
                         print('App Insights account key      : {}'.format(app_insights_account_key))
-                        print('To configure aml with this environment, '
+                        print('To configure az ml with this environment, '
                             'set the following environment variables.')
 
                         if platform.system() in ['Linux', 'linux', 'Unix', 'unix']:
@@ -365,7 +365,7 @@ def env_setup(status, name, context=CommandLineInterfaceContext()):
                         print('ACS Master URL     : {}'.format(acs_master))
                         print('ACS Agent URL      : {}'.format(acs_agent))
                         print('ACS admin username : acsadmin (Needed to set up port forwarding in cluster mode).')
-                        print('To configure aml with this environment, set the following environment variables.')
+                        print('To configure az ml with this environment, set the following environment variables.')
                         if platform.system() in ['Linux', 'linux', 'Unix', 'unix']:
                             write_acs_to_amlenvrc(acs_master, acs_agent, "export")
                         else:
@@ -457,7 +457,7 @@ def env_setup(status, name, context=CommandLineInterfaceContext()):
         except AzureCliError as exc:
             print(exc.message)
 
-    print('To configure aml for local use with this environment, set the following environment variables.')
+    print('To configure az ml for local use with this environment, set the following environment variables.')
     if platform.system() in ['Linux', 'linux', 'Unix', 'unix']:
         env_verb = 'export'
     else:

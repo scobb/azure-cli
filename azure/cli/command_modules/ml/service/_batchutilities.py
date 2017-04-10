@@ -192,7 +192,7 @@ def batch_env_is_valid(context):
         if not context.hdi_pw:
             print("  AML_HDI_PW")
         print("For help setting up environment, run")
-        print("  aml env about")
+        print("  az ml env about")
         print("")
     else:
         hdi_exists = True
@@ -212,7 +212,7 @@ def batch_env_is_valid(context):
                   'AML_HDI_PW environment variables.'.format(
                       batch_get_url(context, BATCH_URL_BASE_FMT, context.hdi_domain)))
             print("For help setting up environment, run")
-            print("  aml env about")
+            print("  az ml env about")
             print("")
         else:
             print('Unexpected return code {} when querying AzureBatch '
@@ -246,7 +246,7 @@ def batch_env_and_storage_are_valid(context):
         if not context.az_account_key:
             print("  AML_STORAGE_ACCT_KEY.")
         print("For help setting up environment, run")
-        print("  aml env about")
+        print("  az ml env about")
         print("")
         return False
 
