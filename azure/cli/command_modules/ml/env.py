@@ -418,11 +418,11 @@ def env_setup(status, name, context=CommandLineInterfaceContext()):
             acr_password = context.acr_pw
         else:
             (acr_login_server, context.acr_username, acr_password) = \
-                az_create_acr(context, root_name, resource_group, storage_account_name)
+                az_create_acr(root_name, resource_group, storage_account_name)
     else:
         try:
             (acr_login_server, context.acr_username, acr_password) = \
-                az_create_acr(context, root_name, resource_group, storage_account_name)
+                az_create_acr(root_name, resource_group, storage_account_name)
         except AzureCliError as exc:
             print(exc.message)
             return

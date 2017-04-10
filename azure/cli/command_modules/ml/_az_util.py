@@ -13,20 +13,20 @@ from builtins import input
 import datetime
 import json
 import re
+import os
 from pkg_resources import resource_string
 from azure.cli.core._profile import Profile
 from azure.cli.core._config import az_config
 from azure.cli.core._util import CLIError
 from azure.cli.core.commands import client_factory
+from azure.cli.core.commands import LongRunningOperation
 import azure.cli.core.azlogging as azlogging
 from azure.mgmt.containerregistry.container_registry_management_client import ContainerRegistryManagementClient
-from azure.mgmt.containerregistry.models import Registry
-from azure.mgmt.containerregistry.models.storage_account_properties import StorageAccountProperties
 from azure.mgmt.storage.storage_management_client import StorageManagementClient
-from azure.mgmt.storage.models import SkuTier
 from azure.mgmt.resource.resources.models import ResourceGroup
 from azure.mgmt.resource.resources import ResourceManagementClient
 from azure.mgmt.resource.resources.models import DeploymentProperties
+from azure.cli.core.util import get_file_json
 
 logger = azlogging.get_az_logger(__name__)
 
@@ -159,55 +159,67 @@ def az_create_storage_account(context, root_name, resource_group, salt=None):
     return storage_account_name, keys[0].value
 
 
-def az_create_acr(context, root_name, resource_group, storage_account_name):
+def get_resource_group_name_by_resource_id(resource_id):
+    '''Returns the resource group name from parsing the resource id.
+    :param str resource_id: The resource id
+    '''
+    resource_id = resource_id.lower()
+    resource_group_keyword = '/resourcegroups/'
+    return resource_id[resource_id.index(resource_group_keyword) + len(resource_group_keyword):
+                       resource_id.index('/providers/')]
+
+
+def get_acr_api_version():
+    return az_config.get('acr', 'apiversion', None)
+
+
+def az_create_acr(root_name, resource_group, storage_account_name):
     """
     Create an ACR registry using the Azure CLI (az).
-    :param context: CommandLineInterfaceContext object
     :param root_name: The prefix to attach to the ACR name.
     :param resource_group: The resource group in which to create the ACR.
     :param storage_account_name: The storage account to use for the ACR.
     :return: Tuple - the ACR login server, username, and password
     """
-
+    arm_client = client_factory.get_mgmt_service_client(ResourceManagementClient)
+    location = arm_client.resource_groups.get(resource_group).location
     acr_name = root_name + 'acr'
     logger.info(
     'Creating ACR registry: {} (please be patient, this can take several minutes)'.format(
         acr_name))
-    customized_acr_version = az_config.get('acr', 'apiversion', None)
-    if customized_acr_version:
-        logger.warning('Customized ACR api-version is used: %s', customized_acr_version)
-        acr_client = client_factory.get_mgmt_service_client(ContainerRegistryManagementClient,
-                                                        api_version=customized_acr_version).registries
-    else:
-        acr_client = client_factory.get_mgmt_service_client(ContainerRegistryManagementClient).registries
-
-    # get storage account, keys
     storage_client = client_factory.get_mgmt_service_client(StorageManagementClient).storage_accounts
     storage_account = storage_client.get_properties(resource_group, storage_account_name)
+    storage_account_rg = get_resource_group_name_by_resource_id(storage_account.id)
+    parameters = {
+        'registryName': {'value': acr_name},
+        'registryLocation': {'value': location},
+        'registrySku': {'value': 'Basic'},
+        'adminUserEnabled': {'value': True},
+        'storageAccountName': {'value': storage_account_name},
+        'storageAccountResourceGroup': {'value': storage_account_rg}
+    }
+    custom_api_version = get_acr_api_version()
+    if custom_api_version:
+        parameters['registryApiVersion'] = {'value': custom_api_version}
 
-    if storage_account.sku.tier == SkuTier.premium: #pylint: disable=no-member
-        raise CLIError('Premium storage account {} is currently not supported. ' \
-                       'Please use standard storage account.'.format(storage_account_name))
+    template = get_file_json(os.path.join(os.path.dirname(__file__), 'data', 'acrtemplate.json'))
+    properties = DeploymentProperties(template=template, parameters=parameters, mode='incremental')
+    deployment_client = client_factory.get_mgmt_service_client(ResourceManagementClient).deployments
+    deployment_name = resource_group + 'deploymentacr' + datetime.datetime.now().strftime(
+        '%Y%m%d%I%M%S')
 
-    storage_key = storage_client.list_keys(resource_group, storage_account_name).keys[0].value #pylint: disable=no-member
+    # deploy via template
+    LongRunningOperation()(deployment_client.create_or_update(resource_group, deployment_name, properties))
 
-    # create acr
-    registry = acr_client.create_or_update(
-        resource_group, acr_name,
-        Registry(
-            location=context.aml_env_default_location,
-            storage_account=StorageAccountProperties(
-                storage_account_name,
-                storage_key
-            ),
-            admin_user_enabled=True
-        )
-    )
-
-    # get acr credential
-    acr_creds = acr_client.get_credentials(resource_group, acr_name)
-
-    return registry.login_server, acr_creds.username, acr_creds.password
+    # fetch finished registry and credentials
+    if custom_api_version:
+        acr_client = client_factory.get_mgmt_service_client(ContainerRegistryManagementClient,
+                                                            api_version=custom_api_version).registries
+    else:
+        acr_client = client_factory.get_mgmt_service_client(ContainerRegistryManagementClient).registries
+    registry = acr_client.get(resource_group, acr_name)
+    acr_creds = acr_client.list_credentials(resource_group, acr_name)
+    return registry.login_server, acr_creds.username, acr_creds.passwords[0].value
 
 
 def az_create_acs(root_name, resource_group, acr_login_server, acr_username,
