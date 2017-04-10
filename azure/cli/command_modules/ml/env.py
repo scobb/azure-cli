@@ -18,7 +18,7 @@ from ._az_util import az_login
 from ._az_util import az_check_subscription
 from ._az_util import az_create_resource_group
 from ._az_util import az_create_storage_account
-from ._az_util import az_create_acr
+from ._az_util import az_create_storage_and_acr
 from ._az_util import az_create_app_insights_account
 from ._az_util import az_create_acs
 
@@ -399,34 +399,11 @@ def env_setup(status, name, context=CommandLineInterfaceContext()):
         if not name:
             az_check_subscription()
         resource_group = az_create_resource_group(context, root_name)
-        storage_account_name, storage_account_key = az_create_storage_account(context, root_name, resource_group)
     except AzureCliError as exc:
         print(exc.message)
         return
 
-    if context.acr_home is not None and context.acr_user is not None and context.acr_pw is not None:
-        print('Found existing ACR setup:')
-        print('ACR Login Server: {}'.format(context.acr_home))
-        print('ACR Username    : {}'.format(context.acr_user))
-        print('ACR Password    : {}'.format(context.acr_pw))
-        answer = input('Setup a new ACR instead (y/N)?')
-        answer = answer.rstrip().lower()
-        if answer != 'y' and answer != 'yes':
-            print('Continuing with configured ACR.')
-            acr_login_server = context.acr_home
-            context.acr_username = context.acr_user
-            acr_password = context.acr_pw
-        else:
-            (acr_login_server, context.acr_username, acr_password) = \
-                az_create_acr(root_name, resource_group, storage_account_name)
-    else:
-        try:
-            (acr_login_server, context.acr_username, acr_password) = \
-                az_create_acr(root_name, resource_group, storage_account_name)
-        except AzureCliError as exc:
-            print(exc.message)
-            return
-
+    app_insights_deployment_id = None
     if context.app_insights_account_name and context.app_insights_account_key:
         print("Found existing app insights account configured:")
         print("App insights account name   : {}".format(context.app_insights_account_name))
@@ -436,10 +413,38 @@ def env_setup(status, name, context=CommandLineInterfaceContext()):
         if answer != 'y' and answer != 'yes':
             print('Continuing with configured app insights account.')
         else:
-            az_create_app_insights_account(root_name, resource_group)
+            app_insights_deployment_id = az_create_app_insights_account(root_name, resource_group)
 
     else:
-        az_create_app_insights_account(root_name, resource_group)
+        app_insights_deployment_id = az_create_app_insights_account(root_name, resource_group)
+
+    if context.acr_home is not None and context.acr_user is not None and context.acr_pw is not None\
+            and context.az_account_name is not None and context.az_account_key is not None:
+        print('Found existing ACR setup:')
+        print('ACR Login Server: {}'.format(context.acr_home))
+        print('ACR Username    : {}'.format(context.acr_user))
+        print('ACR Password    : {}'.format(context.acr_pw))
+        print('Storage Account : {}'.format(context.az_account_name))
+        print('Storage Key     : {}'.format(context.az_account_key))
+        answer = input('Setup a new ACR instead (y/N)?')
+        answer = answer.rstrip().lower()
+        if answer != 'y' and answer != 'yes':
+            print('Continuing with configured ACR.')
+            acr_login_server = context.acr_home
+            context.acr_username = context.acr_user
+            acr_password = context.acr_pw
+            storage_account_name = context.az_account_name
+            storage_account_key = context.az_account_key
+        else:
+            (acr_login_server, context.acr_username, acr_password, storage_account_name, storage_account_key) = \
+                az_create_storage_and_acr(root_name, resource_group)
+    else:
+        try:
+            (acr_login_server, context.acr_username, acr_password, storage_account_name, storage_account_key) = \
+                az_create_storage_and_acr(root_name, resource_group)
+        except AzureCliError as exc:
+            print(exc.message)
+            return
 
     if context.acs_master_url and context.acs_agent_url:
         print('Found existing ACS setup:')
@@ -456,6 +461,9 @@ def env_setup(status, name, context=CommandLineInterfaceContext()):
             az_create_acs(root_name, resource_group, acr_login_server, context.acr_username, acr_password, ssh_public_key)
         except AzureCliError as exc:
             print(exc.message)
+
+    # # complete app insights
+    # if app_insights_deployment_id:
 
     print('To configure az ml for local use with this environment, set the following environment variables.')
     if platform.system() in ['Linux', 'linux', 'Unix', 'unix']:
