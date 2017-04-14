@@ -3,6 +3,7 @@ import subprocess
 import socket
 import os
 import platform
+import time
 from builtins import input
 from ._util import CommandLineInterfaceContext
 from ._util import acs_connection_timeout
@@ -17,10 +18,10 @@ from ._az_util import InvalidNameError
 from ._az_util import az_login
 from ._az_util import az_check_subscription
 from ._az_util import az_create_resource_group
-from ._az_util import az_create_storage_account
 from ._az_util import az_create_storage_and_acr
 from ._az_util import az_create_app_insights_account
 from ._az_util import az_create_acs
+from ._az_util import query_deployment_status
 
 
 def acs_marathon_setup(context):
@@ -247,7 +248,6 @@ def env_cluster(force_connection, forwarded_port, verb, context=CommandLineInter
 
 def env_describe(context=CommandLineInterfaceContext()):
     """Print current environment settings."""
-    # TODO - update with app insights
     if context.in_local_mode():
         print("")
         print("** Warning: Running in local mode. **")
@@ -301,20 +301,6 @@ def env_local(verb, context=CommandLineInterfaceContext()):
     return
 
 
-def write_app_insights_to_amlenvrc(app_insights_account_name, app_insights_account_key, env_verb):
-    env_statements = ["{} AML_APP_INSIGHTS_NAME={}".format(env_verb, app_insights_account_name),
-                      "{} AML_APP_INSIGHTS_KEY={}".format(env_verb, app_insights_account_key)]
-
-    print('\n'.join([' {}'.format(statement) for statement in env_statements]))
-    try:
-        with open(os.path.expanduser('~/.amlenvrc'), 'a+') as env_file:
-            env_file.write('\n'.join(env_statements) + '\n')
-    except IOError:
-        pass
-
-    print('')
-
-
 def write_acs_to_amlenvrc(acs_master, acs_agent, env_verb):
     env_statements = ["{} AML_ACS_MASTER={}".format(env_verb, acs_master),
                       "{} AML_ACS_AGENT={}".format(env_verb, acs_agent)]
@@ -338,43 +324,23 @@ def env_setup(status, name, context=CommandLineInterfaceContext()):
             return
 
         if completed_deployment:
-            if 'appinsights' in completed_deployment.name:
-                try:
-                    (app_insights_account_name, app_insights_account_key) = az_get_app_insights_account(completed_deployment)
-                    if app_insights_account_name and app_insights_account_key:
-                        print('App Insights account deployment succeeded.')
-                        print('App Insights account name     : {}'.format(app_insights_account_name))
-                        print('App Insights account key      : {}'.format(app_insights_account_key))
-                        print('To configure az ml with this environment, '
-                            'set the following environment variables.')
+            try:
+                acs_master = completed_deployment.properties.outputs['masterFQDN']['value']
+                acs_agent = completed_deployment.properties.outputs['agentpublicFQDN']['value']
+                if acs_master and acs_agent:
+                    print('ACS deployment succeeded.')
+                    print('ACS Master URL     : {}'.format(acs_master))
+                    print('ACS Agent URL      : {}'.format(acs_agent))
+                    print('ACS admin username : acsadmin (Needed to set up port forwarding in cluster mode).')
+                    print('To configure az ml with this environment, set the following environment variables.')
+                    if platform.system() in ['Linux', 'linux', 'Unix', 'unix']:
+                        write_acs_to_amlenvrc(acs_master, acs_agent, "export")
+                    else:
+                        write_acs_to_amlenvrc(acs_master, acs_agent, "set")
 
-                        if platform.system() in ['Linux', 'linux', 'Unix', 'unix']:
-                            write_app_insights_to_amlenvrc(app_insights_account_name, app_insights_account_key, "export")
-                        else:
-                            write_app_insights_to_amlenvrc(app_insights_account_name, app_insights_account_key, "set")
-
-                except AzureCliError as exc:
-                    print(exc.message)
-                    return
-            else:
-                try:
-                    acs_master = completed_deployment.properties.outputs['masterFQDN']['value']
-                    acs_agent = completed_deployment.properties.outputs['agentpublicFQDN']['value']
-                    if acs_master and acs_agent:
-                        print('ACS deployment succeeded.')
-                        print('ACS Master URL     : {}'.format(acs_master))
-                        print('ACS Agent URL      : {}'.format(acs_agent))
-                        print('ACS admin username : acsadmin (Needed to set up port forwarding in cluster mode).')
-                        print('To configure az ml with this environment, set the following environment variables.')
-                        if platform.system() in ['Linux', 'linux', 'Unix', 'unix']:
-                            write_acs_to_amlenvrc(acs_master, acs_agent, "export")
-                        else:
-                            write_acs_to_amlenvrc(acs_master, acs_agent, "set")
-
-                        print("To switch to cluster mode, run 'az ml env cluster'.")
-                except AzureCliError as exc:
-                    print(exc.message)
-                    return
+                    print("To switch to cluster mode, run 'az ml env cluster'.")
+            except AzureCliError as exc:
+                print(exc.message)
 
         return
 
@@ -462,20 +428,35 @@ def env_setup(status, name, context=CommandLineInterfaceContext()):
         except AzureCliError as exc:
             print(exc.message)
 
-    # # complete app insights
-    # if app_insights_deployment_id:
-
-    print('To configure az ml for local use with this environment, set the following environment variables.')
     if platform.system() in ['Linux', 'linux', 'Unix', 'unix']:
         env_verb = 'export'
     else:
         env_verb = 'set'
+    env_statements = []
 
-    env_statements = ["{} AML_STORAGE_ACCT_NAME='{}'".format(env_verb, storage_account_name),
-                      "{} AML_STORAGE_ACCT_KEY='{}'".format(env_verb, storage_account_key),
-                      "{} AML_ACR_HOME='{}'".format(env_verb, acr_login_server),
-                      "{} AML_ACR_USER='{}'".format(env_verb, context.acr_username),
-                      "{} AML_ACR_PW='{}'".format(env_verb, acr_password)]
+    # complete app insights
+    if app_insights_deployment_id:
+        completed_deployment = None
+        while not completed_deployment:
+            try:
+                completed_deployment = query_deployment_status(resource_group, app_insights_deployment_id)
+                time.sleep(5)
+            except AzureCliError as exc:
+                print(exc.message)
+                break
+        if completed_deployment:
+            app_insights_account_name, app_insights_account_key = az_get_app_insights_account(completed_deployment)
+            env_statements = ["{} AML_APP_INSIGHTS_NAME={}".format(env_verb, app_insights_account_name),
+                      "{} AML_APP_INSIGHTS_KEY={}".format(env_verb, app_insights_account_key)]
+
+
+    print('To configure az ml for local use with this environment, set the following environment variables.')
+
+    env_statements += ["{} AML_STORAGE_ACCT_NAME='{}'".format(env_verb, storage_account_name),
+                       "{} AML_STORAGE_ACCT_KEY='{}'".format(env_verb, storage_account_key),
+                       "{} AML_ACR_HOME='{}'".format(env_verb, acr_login_server),
+                       "{} AML_ACR_USER='{}'".format(env_verb, context.acr_username),
+                       "{} AML_ACR_PW='{}'".format(env_verb, acr_password)]
     print('\n'.join([' {}'.format(statement) for statement in env_statements]))
 
     try:
