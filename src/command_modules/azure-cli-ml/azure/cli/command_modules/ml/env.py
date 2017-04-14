@@ -4,6 +4,8 @@ import socket
 import os
 import platform
 import time
+import types
+from collections import OrderedDict
 from builtins import input
 from ._util import CommandLineInterfaceContext
 from ._util import acs_connection_timeout
@@ -369,76 +371,41 @@ def env_setup(status, name, context=CommandLineInterfaceContext()):
         print(exc.message)
         return
 
-    app_insights_deployment_id = None
-    if context.app_insights_account_name and context.app_insights_account_key:
-        print("Found existing app insights account configured:")
-        print("App insights account name   : {}".format(context.app_insights_account_name))
-        print("App insights account key    : {}".format(context.app_insights_account_key))
-        answer = context.get_input('Setup a new app insights account instead (y/N)?')
-        answer = answer.rstrip().lower()
-        if answer != 'y' and answer != 'yes':
-            print('Continuing with configured app insights account.')
-        else:
-            app_insights_deployment_id = az_create_app_insights_account(root_name, resource_group)
+    app_insights_deployment_id = create_action_with_prompt_if_defined(
+        context,
+        'App Insights Account',
+        OrderedDict([
+            ('App Insights Account Name', context.app_insights_account_name),
+            ('App Insights Account Key', context.app_insights_account_key)
+        ]), az_create_app_insights_account, [root_name, resource_group])
 
-    else:
-        app_insights_deployment_id = az_create_app_insights_account(root_name, resource_group)
+    (acr_login_server, context.acr_username, acr_password, storage_account_name,
+     storage_account_key) = create_action_with_prompt_if_defined(context, 'ACR and storage', OrderedDict([
+        ('ACR Login Servier', context.acr_home),
+        ('ACR Username', context.acr_user),
+        ('ACR Password', context.acr_pw),
+        ('Storage Account', context.az_account_name),
+        ('Storage Key', context.az_account_key)]
+    ), az_create_storage_and_acr, [root_name, resource_group])
 
-    if context.acr_home is not None and context.acr_user is not None and context.acr_pw is not None\
-            and context.az_account_name is not None and context.az_account_key is not None:
-        print('Found existing ACR setup:')
-        print('ACR Login Server: {}'.format(context.acr_home))
-        print('ACR Username    : {}'.format(context.acr_user))
-        print('ACR Password    : {}'.format(context.acr_pw))
-        print('Storage Account : {}'.format(context.az_account_name))
-        print('Storage Key     : {}'.format(context.az_account_key))
-        answer = input('Setup a new ACR instead (y/N)?')
-        answer = answer.rstrip().lower()
-        if answer != 'y' and answer != 'yes':
-            print('Continuing with configured ACR.')
-            acr_login_server = context.acr_home
-            context.acr_username = context.acr_user
-            acr_password = context.acr_pw
-            storage_account_name = context.az_account_name
-            storage_account_key = context.az_account_key
-        else:
-            (acr_login_server, context.acr_username, acr_password, storage_account_name, storage_account_key) = \
-                az_create_storage_and_acr(root_name, resource_group)
-    else:
-        try:
-            (acr_login_server, context.acr_username, acr_password, storage_account_name, storage_account_key) = \
-                az_create_storage_and_acr(root_name, resource_group)
-        except AzureCliError as exc:
-            print(exc.message)
-            return
+    create_action_with_prompt_if_defined(context, 'ACR and storage', OrderedDict([
+        ('ACS Master URL', context.acs_master_url),
+        ('ACS Agent URL', context.acs_agent_url)]
+    ), az_create_acs, [root_name, resource_group, acr_login_server,
+                       context.acr_username, acr_password, ssh_public_key])
 
-    if context.acs_master_url and context.acs_agent_url:
-        print('Found existing ACS setup:')
-        print('ACS Master URL : {}'.format(context.acs_master_url))
-        print('ACR Agent URL  : {}'.format(context.acs_agent_url))
-        answer = input('Setup a new ACS instead (y/N)?')
-        answer = answer.rstrip().lower()
-        if answer != 'y' and answer != 'yes':
-            print('Continuing with configured ACS.')
-        else:
-            az_create_acs(root_name, resource_group, acr_login_server, context.acr_username, acr_password, ssh_public_key)
-    else:
-        try:
-            az_create_acs(root_name, resource_group, acr_login_server, context.acr_username, acr_password, ssh_public_key)
-        except AzureCliError as exc:
-            print(exc.message)
-
-    if platform.system() in ['Linux', 'linux', 'Unix', 'unix']:
-        env_verb = 'export'
-    else:
-        env_verb = 'set'
+    env_verb = 'export' if context.os_is_linux() else 'set'
     env_statements = []
 
-    # complete app insights
-    if app_insights_deployment_id:
+    if isinstance(app_insights_deployment_id, types.GeneratorType):
+        env_statements = ["{} AML_APP_INSIGHTS_NAME={}".format(env_verb, app_insights_deployment_id.next()),
+                          "{} AML_APP_INSIGHTS_KEY={}".format(env_verb, app_insights_deployment_id.next())]
+
+    else:
         completed_deployment = None
         while not completed_deployment:
             try:
+                print('Querying App Insights deployment...')
                 completed_deployment = query_deployment_status(resource_group, app_insights_deployment_id)
                 time.sleep(5)
             except AzureCliError as exc:
@@ -467,3 +434,22 @@ def env_setup(status, name, context=CommandLineInterfaceContext()):
         pass
 
     print('')
+
+
+def create_action_with_prompt_if_defined(context, action_str, env_dict, action, action_args):
+    prompt = True
+    for key in env_dict:
+        if not env_dict[key]:
+            prompt = False
+            break
+    if prompt:
+        print('Found existing {} set up.'.format(action_str))
+        for key in env_dict:
+            print('{0:16}: {1}'.format(key, env_dict[key]))
+        answer = context.get_input('Setup a new {} instead (y/N)?'.format(action_str))
+        if answer != 'y' and answer != 'yes':
+            print('Continuing with configured {}.'.format(action_str))
+            return (env_dict[key] for key in env_dict)
+        else:
+            return action(*action_args)
+    return action(*action_args)
