@@ -66,4 +66,4 @@ register_cli_argument('ml env cluster', 'forwarded_port', options_list=('-p',), 
                       )
 register_cli_argument('ml env setup', 'status', options_list=('-s', '--status'), metavar='deploymentId', help='Check the status of an ongoing deployment.', required=False)
 register_cli_argument('ml env setup', 'name', options_list=('-n', '--name'), metavar='envName', help='The name of your Azure ML environment (1-20 characters, alphanumeric only).', required=False)
-
+register_cli_argument('ml env setup', 'kubernetes', options_list=('-k', '--kubernetes'), action='store_true', help='Sets up a new Kubernetes cluster.')

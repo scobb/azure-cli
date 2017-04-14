@@ -63,6 +63,7 @@ class CommandLineInterfaceContext(object):
     hdi_home = os.environ.get('AML_HDI_CLUSTER')
     hdi_user = os.environ.get('AML_HDI_USER', '')
     hdi_pw = os.environ.get('AML_HDI_PW', '')
+    env_is_k8s = os.environ.get('AML_ACS_IS_K8S', '')
 
     def __init__(self):
         self.config_path = os.path.join(get_home_dir(), '.amlconf')

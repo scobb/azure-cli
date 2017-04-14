@@ -24,6 +24,8 @@ from ._az_util import az_create_storage_and_acr
 from ._az_util import az_create_app_insights_account
 from ._az_util import az_create_acs
 from ._az_util import query_deployment_status
+from ._k8s_util import KubernetesOperations
+from ._k8s_util import setup_k8s
 
 
 def acs_marathon_setup(context):
@@ -317,7 +319,7 @@ def write_acs_to_amlenvrc(acs_master, acs_agent, env_verb):
     print('')
 
 
-def env_setup(status, name, context=CommandLineInterfaceContext()):
+def env_setup(status, name, kubernetes, context=CommandLineInterfaceContext()):
     if status:
         try:
             completed_deployment = az_check_template_deployment_status(status)
@@ -388,11 +390,17 @@ def env_setup(status, name, context=CommandLineInterfaceContext()):
         ('Storage Key', context.az_account_key)]
     ), az_create_storage_and_acr, [root_name, resource_group])
 
-    create_action_with_prompt_if_defined(context, 'ACS', OrderedDict([
-        ('ACS Master URL', context.acs_master_url),
-        ('ACS Agent URL', context.acs_agent_url)]
-    ), az_create_acs, [root_name, resource_group, acr_login_server,
-                       context.acr_username, acr_password, ssh_public_key])
+    if kubernetes:
+        create_action_with_prompt_if_defined(context, 'Kubernetes Cluster', OrderedDict([
+            ('Kubernetes Cluster Name', KubernetesOperations.get_cluster_name(context))
+        ]), setup_k8s, [context, root_name, resource_group, acr_login_server,
+                        acr_password, ssh_public_key])
+    else:
+        create_action_with_prompt_if_defined(context, 'ACS', OrderedDict([
+            ('ACS Master URL', context.acs_master_url),
+            ('ACS Agent URL', context.acs_agent_url)]
+        ), az_create_acs, [root_name, resource_group, acr_login_server,
+                           context.acr_username, acr_password, ssh_public_key])
 
     env_verb = 'export' if context.os_is_linux() else 'set'
     env_statements = []
