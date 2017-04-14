@@ -353,3 +353,95 @@ def query_deployment_status(resource_group, deployment_name):
     elif result.properties.provisioning_state == 'Failed':
         raise AzureCliError('Template deployment failed.')
     print('Deployment status: {}'.format(result.properties.provisioning_state))
+
+
+def az_create_kubernetes(resource_group, cluster_name, dns_prefix, ssh_key_path):
+    """
+    Creates a new Kubernetes cluster through az. This can take up to 10 minutes.
+    :param resource_group: The name of the resource group to add the cluster to.
+    :param cluster_name: The name of the cluster being created
+    :param dns_prefix: The dns prefix for the cluster.
+    :param ssh_key_path: The absolute path to the ssh key used to set up the cluster.
+
+    :return bool: If creation is successful, return true. Otherwise an exception will be raised.
+    """
+
+    # Check if k8s cluster already exists
+    k8s_check_b = subprocess.check_output(
+        ['az', 'acs', 'show',
+         '--resource-group', resource_group,
+         '--name', cluster_name],
+        stderr=subprocess.PIPE
+    )
+    if k8s_check_b:
+        k8s_check_output = k8s_check_b.decode('ascii')
+        if '"orchestratorType": "Kubernetes"' in k8s_check_output:
+            print("Kubernetes cluster with name {} already found. Skipping creation.".format(cluster_name))
+
+    # Create new K8s cluster
+    else:
+        print("Creating kubernetes cluster. This can take up to 10 minutes.")
+        k8s_create = subprocess.Popen(
+            ['az', 'acs', 'create',
+             '--orchestrator-type=kubernetes',
+             '--resource-group=' + resource_group,
+             '--name=' + cluster_name,
+             '--dns-prefix=' + dns_prefix,
+             '--ssh-key-value=' + ssh_key_path + '.pub'],
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        output, err = k8s_create.communicate()
+        output = output.decode('ascii')
+        if err or '"provisioningState": "Succeeded"' not in output:
+            result = err.decode('ascii')
+            print('Provisioning of kubernetes cluster failed. {}'.format(result))
+            raise AzureCliError('Provisioning of kubernetes cluster failed. {}'.format(result))
+
+
+def az_install_kubectl(context):
+    """Downloads kubectl from kubernetes.io and adds it to the system path. Linux Only."""
+    os_file_ending = '/kubectl'
+    makedirs(path.expanduser('~/bin'))
+    full_install_path = path.expanduser('~/bin') + os_file_ending
+
+    print("Installing kubectl to {}".format(full_install_path))
+    kubectl_install = subprocess.Popen(
+        ['az', 'acs', 'kubernetes', 'install-cli', '--install-location=' + full_install_path],
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    output, err = kubectl_install.communicate()
+    if err:
+        result = err.decode('ascii')
+        if "No such file or directory" in output:
+            print('Unable to install kubectl in directory {}. The provided directory does not exist and the CLI was unable to create the directory. {}'
+                   .format(full_install_path, result))
+        else:
+            print('An error occurred when trying to install kubectl. {}'.format(result))
+        return False
+    return True
+
+
+def az_get_k8s_credentials(resource_group, cluster_name, ssh_key_path):
+    """
+    Downloads Kubernetes config file to the default path of ~/.kube/config
+    :param resource_group: Name of resource group that the cluster is in.
+    :param cluster_name:  Name of the Kubernetes cluster
+    :return: None
+    """
+    print("Downloading kubeconfig file to {}".format(path.expanduser('~')))
+    k8s_get_credentials = subprocess.Popen(
+        ['az', 'acs', 'kubernetes', 'get-credentials',
+         '--resource-group=' + resource_group,
+         '--name=' + cluster_name,
+         '--ssh-key-file=' + ssh_key_path],
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    output, err = k8s_get_credentials.communicate()
+    if err:
+        result = err.decode('ascii')
+        raise AzureCliError('An error occurred while downloading the Kubernetes profile from ACS. {}'.format(result))
+
+
+def az_get_active_email():
+    """
+    Retrieves the email address attached to the user who signed in with az login.
+    :return: string containing user's email address.
+    """
+    return Profile().get_subscription()['user']['name']
