@@ -17,7 +17,6 @@ import os
 from pkg_resources import resource_string
 from azure.cli.core._profile import Profile
 from azure.cli.core._config import az_config
-from azure.cli.core._util import CLIError
 from azure.cli.core.commands import client_factory
 from azure.cli.core.commands import LongRunningOperation
 import azure.cli.core.azlogging as azlogging
@@ -26,7 +25,12 @@ from azure.mgmt.storage.storage_management_client import StorageManagementClient
 from azure.mgmt.resource.resources.models import ResourceGroup
 from azure.mgmt.resource.resources import ResourceManagementClient
 from azure.mgmt.resource.resources.models import DeploymentProperties
-from azure.cli.core.util import get_file_json
+try:
+    from azure.cli.core.util import get_file_json
+    from azure.cli.core.util import CLIError
+except ImportError:
+    from azure.cli.core._util import get_file_json
+    from azure.cli.core._util import CLIError
 
 logger = azlogging.get_az_logger(__name__)
 
@@ -185,8 +189,8 @@ def az_create_storage_and_acr(root_name, resource_group):
     acr_name = root_name + 'acr'
     storage_account_name = root_name + 'stor'
 
-    print('Creating ACR registry: {} (please be patient, this can take several minutes)'.format(
-        acr_name))
+    print('Creating ACR registry and storage account: {} and {} (please be patient, this can take several minutes)'.format(
+        acr_name, storage_account_name))
     parameters = {
         'registryName': {'value': acr_name},
         'registryLocation': {'value': location},
@@ -337,6 +341,10 @@ def az_check_template_deployment_status(deployment_name):
 
     resource_group = deployment_name.split('deployment')[0]
 
+    return query_deployment_status(resource_group, deployment_name)
+
+
+def query_deployment_status(resource_group, deployment_name):
     client = client_factory.get_mgmt_service_client(ResourceManagementClient).deployments
     result = client.get(resource_group, deployment_name)
     if result.properties.provisioning_state == 'Succeeded':
