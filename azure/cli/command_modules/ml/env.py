@@ -381,7 +381,7 @@ def env_setup(status, name, context=CommandLineInterfaceContext()):
 
     (acr_login_server, context.acr_username, acr_password, storage_account_name,
      storage_account_key) = create_action_with_prompt_if_defined(context, 'ACR and storage', OrderedDict([
-        ('ACR Login Servier', context.acr_home),
+        ('ACR Login Server', context.acr_home),
         ('ACR Username', context.acr_user),
         ('ACR Password', context.acr_pw),
         ('Storage Account', context.az_account_name),
@@ -445,7 +445,7 @@ def create_action_with_prompt_if_defined(context, action_str, env_dict, action, 
     if prompt:
         print('Found existing {} set up.'.format(action_str))
         for key in env_dict:
-            print('{0:16}: {1}'.format(key, env_dict[key]))
+            print('{0:30}: {1}'.format(key, env_dict[key]))
         answer = context.get_input('Setup a new {} instead (y/N)?'.format(action_str))
         if answer != 'y' and answer != 'yes':
             print('Continuing with configured {}.'.format(action_str))
