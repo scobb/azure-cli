@@ -118,6 +118,7 @@ def az_create_resource_group(context, root_name):
     if rg_client.check_existence(rg_name):
         print('Resource group {} already exists, skipping creation.'.format(rg_name))
     else:
+        print("Creating resource group {}".format(rg_name))
         rg_client.create_or_update(
             rg_name,
             ResourceGroup(location=context.aml_env_default_location)
@@ -349,4 +350,6 @@ def query_deployment_status(resource_group, deployment_name):
     result = client.get(resource_group, deployment_name)
     if result.properties.provisioning_state == 'Succeeded':
         return result
+    elif result.properties.provisioning_state == 'Failed':
+        raise AzureCliError('Template deployment failed.')
     print('Deployment status: {}'.format(result.properties.provisioning_state))
