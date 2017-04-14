@@ -388,7 +388,7 @@ def env_setup(status, name, context=CommandLineInterfaceContext()):
         ('Storage Key', context.az_account_key)]
     ), az_create_storage_and_acr, [root_name, resource_group])
 
-    create_action_with_prompt_if_defined(context, 'ACR and storage', OrderedDict([
+    create_action_with_prompt_if_defined(context, 'ACS', OrderedDict([
         ('ACS Master URL', context.acs_master_url),
         ('ACS Agent URL', context.acs_agent_url)]
     ), az_create_acs, [root_name, resource_group, acr_login_server,
