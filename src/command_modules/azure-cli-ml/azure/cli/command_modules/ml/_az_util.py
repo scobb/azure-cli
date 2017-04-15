@@ -456,7 +456,7 @@ def az_install_kubectl(context):
     executable = 'kubectl' if context.os_is_linux() else 'kubectl.exe'
     full_install_path = os.path.join(os.path.expanduser('~'), 'bin', executable)
     _makedirs(os.path.dirname(full_install_path))
-    os.environ['PATH'] += os.path.dirname(full_install_path)
+    os.environ['PATH'] += os.pathsep + os.path.dirname(full_install_path)
     k8s_install_cli(install_location=full_install_path)
     return True
 
