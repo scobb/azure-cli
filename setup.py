@@ -21,12 +21,16 @@ CLASSIFIERS = [
 
 DEPENDENCIES = [
     'azure-cli-core',
-    'azure-storage>=0.33',
+    'azure-mgmt-compute==0.33.1rc1',
     'azure-mgmt-containerregistry==0.2.0',
     'azure-mgmt-resource==0.30.2',
     'azure-mgmt-storage==0.31.0',
-    'tabulate>=0.7.7',
+    'azure-storage>=0.33',
     'future',
+    'paramiko',
+    'pyyaml',
+    'scp',
+    'tabulate>=0.7.7',
 ]
 
 with open('README.rst', 'r', encoding='utf-8') as f:
