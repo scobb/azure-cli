@@ -12,11 +12,14 @@ Utilities to interact with the Azure CLI (az).
 from builtins import input
 import datetime
 import json
+import requests
 import re
 import os
 import paramiko
 import yaml
 import errno
+import platform
+import stat
 from scp import SCPClient
 from pkg_resources import resource_string
 from azure.cli.core._profile import Profile
@@ -403,25 +406,58 @@ def az_create_kubernetes(resource_group, cluster_name, dns_prefix, ssh_key_path)
             raise AzureCliError('Provisioning of kubernetes cluster failed. {}'.format(result))
 
 
-def az_install_kubectl(context):
-    """Downloads kubectl from kubernetes.io and adds it to the system path. Linux Only."""
-    os_file_ending = '/kubectl'
-    makedirs(path.expanduser('~/bin'))
-    full_install_path = path.expanduser('~/bin') + os_file_ending
-
-    print("Installing kubectl to {}".format(full_install_path))
-    kubectl_install = subprocess.Popen(
-        ['az', 'acs', 'kubernetes', 'install-cli', '--install-location=' + full_install_path],
-        stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    output, err = kubectl_install.communicate()
-    if err:
-        result = err.decode('ascii')
-        if "No such file or directory" in output:
-            print('Unable to install kubectl in directory {}. The provided directory does not exist and the CLI was unable to create the directory. {}'
-                   .format(full_install_path, result))
+def _makedirs(path):
+    try:
+        os.makedirs(path)
+    except OSError as exc:
+        if exc.errno == errno.EEXIST and os.path.isdir(path):
+            pass
         else:
-            print('An error occurred when trying to install kubectl. {}'.format(result))
-        return False
+            raise
+
+
+def k8s_install_cli(client_version='latest', install_location=None):
+    """
+    Downloads the kubectl command line from Kubernetes
+    """
+
+    if client_version == 'latest':
+        resp = requests.get('https://storage.googleapis.com/kubernetes-release/release/stable.txt')
+        resp.raise_for_status()
+        client_version = resp.content.decode().strip()
+
+    system = platform.system()
+    base_url = 'https://storage.googleapis.com/kubernetes-release/release/{}/bin/{}/amd64/{}'
+    if system == 'Windows':
+        file_url = base_url.format(client_version, 'windows', 'kubectl.exe')
+    elif system == 'Linux':
+        # TODO: Support ARM CPU here
+        file_url = base_url.format(client_version, 'linux', 'kubectl')
+    elif system == 'Darwin':
+        file_url = base_url.format(client_version, 'darwin', 'kubectl')
+    else:
+
+        raise CLIError('Proxy server ({}) does not exist on the cluster.'.format(system))
+
+    logger.warning('Downloading client to %s from %s', install_location, file_url)
+    try:
+        with open(install_location, 'wb') as kubectl:
+            resp = requests.get(file_url)
+            resp.raise_for_status()
+            kubectl.write(resp.content)
+            os.chmod(install_location,
+                     os.stat(install_location).st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+    except (requests.exceptions.HTTPError, requests.exceptions.ConnectionError) as err:
+        raise CLIError('Connection error while attempting to download client ({})'.format(err))
+
+
+def az_install_kubectl(context):
+    """Downloads kubectl from kubernetes.io and adds it to the system path."""
+    executable = 'kubectl' if context.os_is_linux() else 'kubectl.exe'
+    full_install_path = os.path.join(os.path.expanduser('~'), 'bin', executable)
+    _makedirs(os.path.dirname(full_install_path))
+    os.environ['PATH'] += os.path.dirname(full_install_path)
+    k8s_install_cli(install_location=full_install_path)
     return True
 
 
@@ -515,13 +551,7 @@ def az_get_k8s_credentials(resource_group, cluster_name, ssh_key_path):
     dns_prefix = acs_info.master_profile.dns_prefix
     location = acs_info.location
     user = acs_info.linux_profile.admin_username
-    try:
-        os.makedirs(os.path.dirname(path))
-    except OSError as exc:  # Python >2.5
-        if exc.errno == errno.EEXIST and os.path.isdir(path):
-            pass
-        else:
-            raise
+    _makedirs(os.path.dirname(path))
 
     path_candidate = path
     ix = 0
