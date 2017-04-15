@@ -14,12 +14,18 @@ import datetime
 import json
 import re
 import os
+import paramiko
+import yaml
+import errno
+from scp import SCPClient
 from pkg_resources import resource_string
 from azure.cli.core._profile import Profile
 from azure.cli.core._config import az_config
+from azure.cli.core.prompting import prompt_pass
 from azure.cli.core.commands import client_factory
 from azure.cli.core.commands import LongRunningOperation
 import azure.cli.core.azlogging as azlogging
+from azure.mgmt.compute.compute_management_client import ComputeManagementClient
 from azure.mgmt.containerregistry.container_registry_management_client import ContainerRegistryManagementClient
 from azure.mgmt.storage.storage_management_client import StorageManagementClient
 from azure.mgmt.resource.resources.models import ResourceGroup
@@ -419,6 +425,82 @@ def az_install_kubectl(context):
     return True
 
 
+def _load_key(key_filename):
+    try:
+        pkey = paramiko.RSAKey.from_private_key_file(key_filename, None)
+    except paramiko.PasswordRequiredException:
+        key_pass = prompt_pass('Passphrase for {}:'.format(key_filename))
+        pkey = paramiko.RSAKey.from_private_key_file(key_filename, key_pass)
+    if pkey is None:
+        raise CLIError('failed to load key: {}'.format(key_filename))
+    return pkey
+
+
+def secure_copy(user, host, src, dest,  # pylint: disable=too-many-arguments
+               key_filename=os.path.join(os.path.expanduser("~"), '.ssh', 'id_rsa')):
+
+    ssh = paramiko.SSHClient()
+    ssh.load_system_host_keys()
+    ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+
+    pkey = _load_key(key_filename)
+
+    ssh.connect(host, username=user, pkey=pkey)
+    scp = SCPClient(ssh.get_transport())
+
+    scp.get(src, dest)
+    scp.close()
+
+
+def _handle_merge(existing, addition, key):
+    if addition[key]:
+        if existing[key] is None:
+            existing[key] = addition[key]
+            return
+
+        for i in addition[key]:
+            if i not in existing[key]:
+                existing[key].append(i)
+
+
+def merge_kubernetes_configurations(existing_file, addition_file):
+    try:
+        with open(existing_file) as stream:
+            existing = yaml.safe_load(stream)
+    except (IOError, OSError) as ex:
+        if getattr(ex, 'errno', 0) == errno.ENOENT:
+            raise CLIError('{} does not exist'.format(existing_file))
+        else:
+            raise
+    except yaml.parser.ParserError as ex:
+        raise CLIError('Error parsing {} ({})'.format(existing_file, str(ex)))
+
+    if existing is None:
+        raise CLIError('failed to load existing configuration from {}'.format(existing_file))
+
+    try:
+        with open(addition_file) as stream:
+            addition = yaml.safe_load(stream)
+    except (IOError, OSError) as ex:
+        if getattr(ex, 'errno', 0) == errno.ENOENT:
+            raise CLIError('{} does not exist'.format(existing_file))
+        else:
+            raise
+    except yaml.parser.ParserError as ex:
+        raise CLIError('Error parsing {} ({})'.format(addition_file, str(ex)))
+
+    if addition is None:
+        raise CLIError('failed to load additional configuration from {}'.format(addition_file))
+
+    _handle_merge(existing, addition, 'clusters')
+    _handle_merge(existing, addition, 'users')
+    _handle_merge(existing, addition, 'contexts')
+    existing['current-context'] = addition['current-context']
+
+    with open(existing_file, 'w+') as stream:
+        yaml.dump(existing, stream, default_flow_style=True)
+
+
 def az_get_k8s_credentials(resource_group, cluster_name, ssh_key_path):
     """
     Downloads Kubernetes config file to the default path of ~/.kube/config
@@ -426,17 +508,37 @@ def az_get_k8s_credentials(resource_group, cluster_name, ssh_key_path):
     :param cluster_name:  Name of the Kubernetes cluster
     :return: None
     """
-    print("Downloading kubeconfig file to {}".format(path.expanduser('~')))
-    k8s_get_credentials = subprocess.Popen(
-        ['az', 'acs', 'kubernetes', 'get-credentials',
-         '--resource-group=' + resource_group,
-         '--name=' + cluster_name,
-         '--ssh-key-file=' + ssh_key_path],
-        stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    output, err = k8s_get_credentials.communicate()
-    if err:
-        result = err.decode('ascii')
-        raise AzureCliError('An error occurred while downloading the Kubernetes profile from ACS. {}'.format(result))
+    print("Downloading kubeconfig file to {}".format(os.path.expanduser('~')))
+    path = os.path.join(os.path.expanduser('~'), '.kube', 'config')
+    mgmt_client = client_factory.get_mgmt_service_client(ComputeManagementClient)
+    acs_info = mgmt_client.container_services.get(resource_group, cluster_name)
+    dns_prefix = acs_info.master_profile.dns_prefix
+    location = acs_info.location
+    user = acs_info.linux_profile.admin_username
+    try:
+        os.makedirs(os.path.dirname(path))
+    except OSError as exc:  # Python >2.5
+        if exc.errno == errno.EEXIST and os.path.isdir(path):
+            pass
+        else:
+            raise
+
+    path_candidate = path
+    ix = 0
+    while os.path.exists(path_candidate):
+        ix += 1
+        path_candidate = '{}-{}-{}'.format(path, cluster_name, ix)
+
+    secure_copy(user, '{}.{}.cloudapp.azure.com'.format(dns_prefix, location),
+                '.kube/config', path_candidate, key_filename=ssh_key_path)
+
+    # merge things
+    if path_candidate != path:
+        try:
+            merge_kubernetes_configurations(path, path_candidate)
+        except yaml.YAMLError as exc:
+            logger.warning('Failed to merge credentials to kube config file: %s', exc)
+            logger.warning('The credentials have been saved to %s', path_candidate)
 
 
 def az_get_active_email():
