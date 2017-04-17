@@ -406,9 +406,9 @@ def realtime_service_create(score_file, dependencies, requirements, schema_file,
     else:
         app_insights_enabled = 'true'
 
-    if (score_file == '' or
-        service_name == '' or
-        target_runtime not in RealtimeConstants.supported_runtimes):
+    is_known_runtime = \
+        target_runtime in RealtimeConstants.supported_runtimes or target_runtime in RealtimeConstants.ninja_runtimes
+    if score_file == '' or service_name == '' or not is_known_runtime:
         print(RealtimeConstants.create_cmd_sample)
         return
 
