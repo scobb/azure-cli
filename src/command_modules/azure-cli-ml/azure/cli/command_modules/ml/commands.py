@@ -34,3 +34,4 @@ cli_command(__name__, 'ml service run realtime', 'azure.cli.command_modules.ml.s
 #
 # cli_command(__name__, 'ml email', 'azure.cli.command_modules.ml._az_util#az_get_active_email')
 # cli_command(__name__, 'ml kube', 'azure.cli.command_modules.ml._az_util#az_install_kubectl')
+cli_command(__name__, 'ml k8s', 'azure.cli.command_modules.ml._az_util#az_create_kubernetes')

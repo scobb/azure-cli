@@ -374,36 +374,35 @@ def az_create_kubernetes(resource_group, cluster_name, dns_prefix, ssh_key_path)
 
     :return bool: If creation is successful, return true. Otherwise an exception will be raised.
     """
+    from azure.mgmt.compute.containerservice import ContainerServiceClient
+    from msrestazure.azure_exceptions import CloudError
+    client = client_factory.get_mgmt_service_client(ContainerServiceClient).container_services
+    try:
+        client.get(resource_group, cluster_name)
+        print("Kubernetes cluster with name {} already found. Skipping creation.".format(cluster_name))
+    except CloudError as exc:
+        if 'was not found' not in exc.message:
+            raise
 
-    # Check if k8s cluster already exists
-    k8s_check_b = subprocess.check_output(
-        ['az', 'acs', 'show',
-         '--resource-group', resource_group,
-         '--name', cluster_name],
-        stderr=subprocess.PIPE
-    )
-    if k8s_check_b:
-        k8s_check_output = k8s_check_b.decode('ascii')
-        if '"orchestratorType": "Kubernetes"' in k8s_check_output:
-            print("Kubernetes cluster with name {} already found. Skipping creation.".format(cluster_name))
+
+    return
 
     # Create new K8s cluster
-    else:
-        print("Creating kubernetes cluster. This can take up to 10 minutes.")
-        k8s_create = subprocess.Popen(
-            ['az', 'acs', 'create',
-             '--orchestrator-type=kubernetes',
-             '--resource-group=' + resource_group,
-             '--name=' + cluster_name,
-             '--dns-prefix=' + dns_prefix,
-             '--ssh-key-value=' + ssh_key_path + '.pub'],
-            stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        output, err = k8s_create.communicate()
-        output = output.decode('ascii')
-        if err or '"provisioningState": "Succeeded"' not in output:
-            result = err.decode('ascii')
-            print('Provisioning of kubernetes cluster failed. {}'.format(result))
-            raise AzureCliError('Provisioning of kubernetes cluster failed. {}'.format(result))
+    print("Creating kubernetes cluster. This can take up to 10 minutes.")
+    k8s_create = subprocess.Popen(
+        ['az', 'acs', 'create',
+         '--orchestrator-type=kubernetes',
+         '--resource-group=' + resource_group,
+         '--name=' + cluster_name,
+         '--dns-prefix=' + dns_prefix,
+         '--ssh-key-value=' + ssh_key_path + '.pub'],
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    output, err = k8s_create.communicate()
+    output = output.decode('ascii')
+    if err or '"provisioningState": "Succeeded"' not in output:
+        result = err.decode('ascii')
+        print('Provisioning of kubernetes cluster failed. {}'.format(result))
+        raise AzureCliError('Provisioning of kubernetes cluster failed. {}'.format(result))
 
 
 def _makedirs(path):

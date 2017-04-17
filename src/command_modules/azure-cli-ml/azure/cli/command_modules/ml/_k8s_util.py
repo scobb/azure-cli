@@ -157,7 +157,7 @@ class KubernetesOperations:
         """
         retries = 0
         max_retries = 3
-        while(retries < max_retries):
+        while retries < max_retries:
             try:
                 client.CoreV1Api().create_namespaced_secret(namespace, body)
                 return True
@@ -292,27 +292,21 @@ def deploy_frontend(k8s_ops, acr_email):
 
 def check_for_kubectl(context):
     """Checks whether kubectl is present on the system path."""
-    if context.os_is_linux():
-        try:
+    try:
+        if context.os_is_linux():
             subprocess.check_output('kubectl')
-            return True
-        except (subprocess.CalledProcessError, OSError):
-            auto_install = input('Failed to find kubectl on the path. One click install? (Y/n): ')
-            if 'n' not in auto_install:
-                return az_install_kubectl(context)
-            else:
-                print('To install Kubectl run the following commands and then re-run aml env setup')
-                print('curl -LO https://storage.googleapis.com/kubernetes-release/release/' +
-                      '$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)' +
-                      '/bin/linux/amd64/kubectl')
-                print('chmod +x ./kubectl')
-                print('sudo mv ./kubectl ~/bin')
-                return False
-    else:
-        try:
+        else:
             subprocess.check_output('kubectl', shell=True)
-        except (subprocess.CalledProcessError, OSError):
-            print("Failed to find kubectl on the path.")
-            print('Currently automatic install is only supported on Linux.')
-            print('Follow the directions at https://kubernetes.io/docs/tasks/kubectl/install/ to install for Windows')
+        return True
+    except (subprocess.CalledProcessError, OSError):
+        auto_install = input('Failed to find kubectl on the path. One click install? (Y/n): ').lower().strip()
+        if 'n' not in auto_install and 'no' not in auto_install:
+            return az_install_kubectl(context)
+        else:
+            print('To install Kubectl run the following commands and then re-run az ml env setup')
+            print('curl -LO https://storage.googleapis.com/kubernetes-release/release/' +
+                  '$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)' +
+                  '/bin/linux/amd64/kubectl')
+            print('chmod +x ./kubectl')
+            print('sudo mv ./kubectl ~/bin')
             return False
