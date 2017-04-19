@@ -21,6 +21,7 @@ CLASSIFIERS = [
 
 DEPENDENCIES = [
     'azure-cli-core',
+    'azure-graphrbac==0.30.0rc6',
     'azure-mgmt-compute==1.0.0rc1',
     'azure-mgmt-containerregistry==0.2.0',
     'azure-mgmt-resource==0.30.2',
