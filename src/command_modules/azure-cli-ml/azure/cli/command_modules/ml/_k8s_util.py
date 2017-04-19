@@ -7,6 +7,7 @@ import time
 import json
 import os
 import subprocess
+from builtins import input
 from ._az_util import az_create_kubernetes
 from ._az_util import az_get_k8s_credentials
 from ._az_util import az_get_active_email
@@ -235,7 +236,8 @@ class KubernetesOperations:
             self.encode_acr_credentials(server, username, password, email), key)
 
 
-def setup_k8s(context, root_name, resource_group, acr_login_server, acr_password, ssh_key_path):
+def setup_k8s(context, root_name, resource_group, acr_login_server, acr_password, ssh_public_key,
+              ssh_private_key_path):
     """
 
     Creates and configures a new Kubernetes Cluster on Azure with:
@@ -246,7 +248,8 @@ def setup_k8s(context, root_name, resource_group, acr_login_server, acr_password
     :param resource_group: The resource group to create the cluster in.
     :param acr_login_server: The base url of the user's ACR.
     :param acr_password: The password for the user's ACR.
-    :param ssh_key_path: Absolute path to the ssh key used to set up the cluster
+    :param ssh_public_key: Value of ssh public key
+    :param ssh_private_key_path: str path to private key
 
     :return: None
     """
@@ -256,8 +259,8 @@ def setup_k8s(context, root_name, resource_group, acr_login_server, acr_password
         if not check_for_kubectl(context):
             return False
         acr_email = az_get_active_email()
-        az_create_kubernetes(resource_group, cluster_name, root_name, ssh_key_path)
-        az_get_k8s_credentials(resource_group, cluster_name, ssh_key_path)
+        az_create_kubernetes(resource_group, cluster_name, root_name, ssh_public_key)
+        az_get_k8s_credentials(resource_group, cluster_name, ssh_private_key_path)
         k8s_ops = KubernetesOperations()
         k8s_ops.add_acr_secret(context.acr_username + 'acrkey', context.acr_username, acr_login_server,
                                acr_password, acr_email)

@@ -349,7 +349,7 @@ def env_setup(status, name, kubernetes, context=CommandLineInterfaceContext()):
         return
 
     try:
-        ssh_public_key = create_ssh_key_if_not_exists()
+        ssh_private_key_path, ssh_public_key = create_ssh_key_if_not_exists()
     except AzureCliError:
         return
 
@@ -394,7 +394,7 @@ def env_setup(status, name, kubernetes, context=CommandLineInterfaceContext()):
         create_action_with_prompt_if_defined(context, 'Kubernetes Cluster', OrderedDict([
             ('Kubernetes Cluster Name', KubernetesOperations.get_cluster_name(context))
         ]), setup_k8s, [context, root_name, resource_group, acr_login_server,
-                        acr_password, ssh_public_key])
+                        acr_password, ssh_public_key, ssh_private_key_path])
     else:
         create_action_with_prompt_if_defined(context, 'ACS', OrderedDict([
             ('ACS Master URL', context.acs_master_url),

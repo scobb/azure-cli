@@ -742,15 +742,17 @@ def is_int(int_str):
 
 def create_ssh_key_if_not_exists():
     from ._az_util import AzureCliError
-    if not os.path.exists(os.path.join(os.path.expanduser('~'), '.ssh', 'id_rsa')):
+    private_key_path = os.path.join(os.path.expanduser('~'), '.ssh', 'id_rsa')
+    public_key_path = '{}.pub'.format(private_key_path)
+    if not os.path.exists(private_key_path):
         try:
-            subprocess.check_call(['ssh-keygen', '-t', 'rsa', '-b', '2048', '-f', os.path.expanduser('~/.ssh/id_rsa')])
+            subprocess.check_call(['ssh-keygen', '-t', 'rsa', '-b', '2048', '-f', private_key_path])
         except subprocess.CalledProcessError:
             print('Failed to set up sh key pair. Aborting environment setup.')
             raise AzureCliError('')
 
     try:
-        with open(os.path.expanduser('~/.ssh/id_rsa.pub'), 'r') as sshkeyfile:
+        with open(os.path.expanduser(public_key_path), 'r') as sshkeyfile:
             ssh_public_key = sshkeyfile.read().rstrip()
     except IOError:
         print('Could not load your SSH public key from {}'.format(
@@ -758,4 +760,4 @@ def create_ssh_key_if_not_exists():
         print('Please run az ml env setup again to create a new ssh keypair.')
         raise AzureCliError('')
 
-    return ssh_public_key
+    return private_key_path, ssh_public_key
