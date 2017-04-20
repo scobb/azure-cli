@@ -403,6 +403,7 @@ def realtime_service_create(score_file, dependencies, requirements, schema_file,
     verbose = verb
     if logging_level == 'none':
         app_insights_enabled = 'false'
+        logging_level = 'debug'
     else:
         app_insights_enabled = 'true'
 
