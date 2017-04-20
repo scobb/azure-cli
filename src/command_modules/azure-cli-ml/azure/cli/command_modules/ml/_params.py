@@ -51,7 +51,7 @@ register_cli_argument('ml service create realtime', 'custom_ice_url', options_li
                       help=argparse.SUPPRESS)
 register_cli_argument('ml service create realtime', 'target_runtime', options_list=('-r',), default='spark-py',
                       help='Runtime of the web service. Valid runtimes are {}'.format('|'.join(RealtimeConstants.supported_runtimes)), required=False)
-register_cli_argument('ml service create realtime', 'logging_level', options_list=('-l',), default='none', const = 'debug',
+register_cli_argument('ml service create realtime', 'logging_level', options_list=('-l',), default='none', const='debug',
                       nargs='?', help='Logging level. Valid levels are {}'.format('|'.join(RealtimeConstants.supported_logging_levels)), required=False)
 register_cli_argument('ml service run realtime', 'input_data', options_list=('-d',), default='',
                       help='The data to use for calling the web service.', required=False)
