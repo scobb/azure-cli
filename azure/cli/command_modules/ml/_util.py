@@ -742,10 +742,11 @@ def is_int(int_str):
 
 def create_ssh_key_if_not_exists():
     from ._az_util import AzureCliError
-    private_key_path = os.path.join(os.path.expanduser('~'), '.ssh', 'id_rsa')
+    private_key_path = os.path.join(os.path.expanduser('~'), '.ssh', 'acs_id_rsa')
     public_key_path = '{}.pub'.format(private_key_path)
     if not os.path.exists(private_key_path):
         try:
+            print('Creating ssh key {}'.format(private_key_path))
             subprocess.check_call(['ssh-keygen', '-t', 'rsa', '-b', '2048', '-f', private_key_path])
         except subprocess.CalledProcessError:
             print('Failed to set up sh key pair. Aborting environment setup.')
