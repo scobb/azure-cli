@@ -32,7 +32,7 @@ import azure.cli.core.azlogging as azlogging
 from azure.mgmt.compute.containerservice import ContainerServiceClient
 from azure.mgmt.containerregistry.container_registry_management_client import \
     ContainerRegistryManagementClient
-from azure.mgmt.storage.storage_management_client import StorageManagementClient
+from azure.mgmt.storage import StorageManagementClient
 from azure.mgmt.resource.resources.models import ResourceGroup
 from azure.mgmt.resource.resources import ResourceManagementClient
 from azure.mgmt.resource.resources.models import DeploymentProperties
@@ -152,38 +152,6 @@ def az_register_provider(namespace):
     """ Registers a given resource provider with Azure."""
     client = client_factory.get_mgmt_service_client(ResourceManagementClient).providers
     client.register(namespace)
-
-
-def az_create_storage_account(context, root_name, resource_group, salt=None):
-    """
-    Create a storage account for the AML environment.
-    :param context: CommandLineInterfaceContext object
-    :param root_name: The name to use as a prefix for the storage account.
-    :param resource_group: The resource group in which to create the storage account.
-    :param salt: An optional salt to append to the storage account name.
-    :return: string - the name of the storage account created, if successful.
-    """
-
-    from azure.mgmt.storage.models import \
-        (StorageAccountCreateParameters, Sku)
-    storage_account_name = root_name + 'stor'
-    if salt:
-        storage_account_name = storage_account_name + salt
-
-    az_register_provider('Microsoft.Storage')
-
-    print('Creating storage account {}.'.format(storage_account_name))
-    client = client_factory.get_mgmt_service_client(
-        StorageManagementClient).storage_accounts
-    client.create(resource_group, storage_account_name,
-                  StorageAccountCreateParameters(
-                      location=context.aml_env_default_location,
-                      sku=Sku('Standard_LRS'),
-                      kind='Storage',
-                  )).wait()
-    keys = client.list_keys(resource_group, storage_account_name).keys
-
-    return storage_account_name, keys[0].value
 
 
 def get_resource_group_name_by_resource_id(resource_id):
