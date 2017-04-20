@@ -288,7 +288,7 @@ def deploy_frontend(k8s_ops, acr_email):
     k8s_ops.add_acr_secret('amlintfeacrkey', 'azuremlintfe.azurecr.io',
                            'azuremlintfe', 'Zxw+PXQ+KZ1KEEX5172EMc/xN0RTTmyP', acr_email)
     k8s_ops.deploy_deployment(os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                                           'data', 'fe-elixir-dep.yaml'), 120, 1, 'amlintfeacrkey')
+                                           'data', 'azureml-fe-dep.yaml'), 120, 1, 'amlintfeacrkey')
     k8s_ops.expose_frontend(os.path.join(os.path.dirname(os.path.abspath(__file__)),
                                          'data', 'azureml-fe-service.yaml'))
 
