@@ -6,6 +6,7 @@ import yaml
 import time
 import json
 import os
+import re
 import subprocess
 from builtins import input
 from ._az_util import az_create_kubernetes
@@ -142,12 +143,27 @@ class KubernetesOperations:
             namespace = 'default'
             label_selector = 'webservicename=={}'.format(webservicename)
             api_response = k8s_core.list_namespaced_service(namespace, label_selector=label_selector)
-            if len(api_response.items) is 0:
-                return None
+            if len(api_response.items) == 0:
+                raise ApiException(status=404, reason="Service with label selector: {} not found".format(label_selector))
 
             return api_response.items[0]
         except ApiException as e:
             print("Exception occurred while getting a namespaced service. {}".format(e))
+
+    def delete_service(self, webservicename):
+        """
+        Deletes a service with a given webservicename
+        :param webservicename:
+        :return: None
+        """
+        try:
+            k8s_core = client.CoreV1Api()
+            namespace = 'default'
+            k8s_core.delete_namespaced_service(webservicename, namespace)
+
+        except ApiException as exc:
+            print("Exception occurred in delete_service. {}".format(exc))
+            raise
 
     def create_acr_secret_if_not_exist(self, namespace, body):
         """
@@ -234,6 +250,73 @@ class KubernetesOperations:
         """
         return self.create_or_replace_docker_secret_if_exists(
             self.encode_acr_credentials(server, username, password, email), key)
+
+    def delete_deployment(self, webservicename):
+        """
+        Deletes a deployment with a given webservicename
+        :param webservicename:
+        :return: None
+        """
+        try:
+            k8s_core = client.ExtensionsV1beta1Api()
+            namespace = 'default'
+            delete_options = client.V1DeleteOptions()
+            name = webservicename + '-deployment'
+            k8s_core.delete_namespaced_deployment(name, namespace, delete_options)
+            self.delete_replica_set(name)
+
+        except ApiException as exc:
+            print("Exception occurred in delete_deployment. {}".format(exc))
+            raise
+
+    def get_filtered_deployments(self, label_selector=''):
+        """
+        Retrieves a list of deployment objects filtered by the given label_selector
+        :param label_selector: Formatted label selector i.e. "webservicename==deployed_service_name"
+        :return list[Kubernetes.client.ExtensionsV1beta1Deployment:
+        """
+        k8s_beta = client.ExtensionsV1beta1Api()
+        namespace = 'default'
+        try:
+            deployment_list = k8s_beta.list_namespaced_deployment(namespace, label_selector=label_selector)
+            return deployment_list.items
+        except ApiException as exc:
+            print("Exception occurred in get_filtered_deployments. ".format(exc))
+            raise
+
+    def delete_replica_set(self, deployment_name):
+        try:
+            print("Deleting replicaset for deployment {}".format(deployment_name))
+
+            # Pipe output of get_rs_proc to grep_named_rs_row_proc
+            get_rs_output = subprocess.check_output(['kubectl', 'get', 'rs'])
+            rs_regex = r'(?P<rs_name>{}-[0-9]+)'.format(deployment_name)
+            s = re.search(rs_regex, get_rs_output)
+            if s:
+                subprocess.check_call(['kubectl', 'delete', 'rs', s.group('rs_name')])
+        except subprocess.CalledProcessError as exc:
+            print("Unable to delete replica set for deployment {}. {} {}".format(deployment_name, exc, exc.output))
+            raise
+
+    def create_service(self, service_yaml, webservicename, webservice_type):
+        try:
+            k8s_core = client.CoreV1Api()
+            namespace = 'default'
+            with open(os.path.join(os.path.dirname(__file__), service_yaml)) as f:
+                dep = yaml.load(f)
+                dep['metadata']['name'] = str(webservicename)
+                dep['metadata']['labels']['webservicename'] = str(webservicename)
+                dep['metadata']['labels']['azuremlappname'] = str(webservicename)
+                dep['metadata']['labels']['webservicetype'] = str(webservice_type)
+                dep['spec']['selector']['webservicename'] = str(webservicename)
+                print("Payload: {0}".format(dep))
+                k8s_core.create_namespaced_service(body=dep, namespace=namespace)
+                print("Created service with Name: {0}".format(webservicename))
+        except ApiException as e:
+            exc_json = json.loads(e.body)
+            if 'AlreadyExists' in exc_json['reason']:
+                return
+            print("Exception during service creation: %s" % e)
 
 
 def setup_k8s(context, root_name, resource_group, acr_login_server, acr_password, ssh_public_key,

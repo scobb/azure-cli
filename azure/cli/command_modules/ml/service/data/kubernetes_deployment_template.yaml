@@ -1,0 +1,32 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: null
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        webservicename: null
+        azuremlappname: null
+        isazuremlapp: "true"
+        type: null
+    spec:
+      containers:
+        - image: null
+          name: null
+          resources:
+            requests:
+              cpu: 100m
+              memory: 1024Mi
+          env:
+           - name: AML_APP_INSIGHTS_KEY
+             value: null
+           - name: AML_APP_INSIGHTS_ENABLED
+             value: null
+           - name: AML_CONSOLE_LOG
+             value: null
+          ports:
+            - containerPort: 5001
+      imagePullSecrets:
+        - name: null
