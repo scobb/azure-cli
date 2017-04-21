@@ -5,7 +5,7 @@ import json
 from mock import patch
 from mocks import TestContext
 from mocks import MockProcess
-from azure.cli.core._util import CLIError
+from azure.cli.core.util import CLIError
 from azure.cli.command_modules.ml._az_util import validate_env_name
 from azure.cli.command_modules.ml._az_util import az_login
 from azure.cli.command_modules.ml._az_util import az_check_subscription

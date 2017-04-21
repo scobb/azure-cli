@@ -9,15 +9,8 @@ from dateutil.relativedelta import relativedelta
 
 from msrestazure.azure_exceptions import CloudError
 from azure.cli.core.commands import client_factory
-
-try:
-    from azure.cli.core.util import get_file_json
-    from azure.cli.core.util import CLIError
-    from azure.cli.core.util import shell_safe_json_parse
-except ImportError:
-    from azure.cli.core._util import get_file_json
-    from azure.cli.core._util import CLIError
-    from azure.cli.core._util import shell_safe_json_parse
+from azure.cli.core.util import CLIError
+from azure.cli.core.util import shell_safe_json_parse
 
 from azure.graphrbac.models import (ApplicationCreateParameters,
                                     PasswordCredential,

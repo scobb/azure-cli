@@ -43,14 +43,9 @@ from ._acs_util import _build_service_principal
 from ._acs_util import store_acs_service_principal
 from ._acs_util import _create_kubernetes
 
-try:
-    from azure.cli.core.util import get_file_json
-    from azure.cli.core.util import CLIError
-    from azure.cli.core.util import shell_safe_json_parse
-except ImportError:
-    from azure.cli.core._util import get_file_json
-    from azure.cli.core._util import CLIError
-    from azure.cli.core._util import shell_safe_json_parse
+
+from azure.cli.core.util import get_file_json
+from azure.cli.core.util import CLIError
 
 logger = azlogging.get_az_logger(__name__)
 
