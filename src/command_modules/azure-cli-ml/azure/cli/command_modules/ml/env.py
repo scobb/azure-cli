@@ -26,11 +26,16 @@ from ._az_util import az_create_acs
 from ._az_util import query_deployment_status
 from ._k8s_util import KubernetesOperations
 from ._k8s_util import setup_k8s
+from ..ml import __version__
+
+
+def version():
+    print('Azure Machine Learning Command Line Tools {}'.format(__version__))
 
 
 def acs_marathon_setup(context):
     """Helps set up port forwarding to an ACS cluster."""
-
+    # TODO - use paramiko here to set up tunneling?
     if context.os_is_linux():
         print('Establishing connection to ACS cluster.')
         acs_url = context.get_input(
@@ -209,29 +214,6 @@ def env_cluster(force_connection, forwarded_port, verb, context=CommandLineInter
         print('Please use -f and -p exclusively.')
         return
 
-    # if -f was specified, try direct connection only
-    if force_connection:
-        (acs_is_setup, port) = validate_acs_marathon(context, 0)
-    # if only -p specified, without a port number, set up a new tunnel.
-    elif not forwarded_port:
-        (acs_is_setup, port) = acs_marathon_setup(context)
-    # if either no arguments specified (forwarded_port == -1), or -p NNNNN specified (forwarded_port == NNNNN),
-    # test for an existing connection (-1), or the specified port (NNNNN)
-    elif forwarded_port:
-        (acs_is_setup, port) = validate_acs_marathon(context, forwarded_port)
-    # This should never happen
-    else:
-        (acs_is_setup, port) = (False, -1)
-
-    if not acs_is_setup:
-        continue_without_acs = context.get_input(
-            'Could not connect to ACS cluster. Continue with cluster mode anyway (y/N)? ')
-        continue_without_acs = continue_without_acs.strip().lower()
-        if continue_without_acs != 'y' and continue_without_acs != 'yes':
-            print(
-                "Aborting switch to cluster mode. Please run 'az ml env about' for more information on setting up your cluster.")  # pylint: disable=line-too-long
-            return
-
     try:
         conf = context.read_config()
         if not conf:
@@ -242,8 +224,33 @@ def env_cluster(force_connection, forwarded_port, verb, context=CommandLineInter
             print('[Debug] Resetting.')
         conf = {}
 
+    if not context.env_is_k8s:
+        # if -f was specified, try direct connection only
+        if force_connection:
+            (acs_is_setup, port) = validate_acs_marathon(context, 0)
+        # if only -p specified, without a port number, set up a new tunnel.
+        elif not forwarded_port:
+            (acs_is_setup, port) = acs_marathon_setup(context)
+        # if either no arguments specified (forwarded_port == -1), or -p NNNNN specified (forwarded_port == NNNNN),
+        # test for an existing connection (-1), or the specified port (NNNNN)
+        elif forwarded_port:
+            (acs_is_setup, port) = validate_acs_marathon(context, forwarded_port)
+        # This should never happen
+        else:
+            (acs_is_setup, port) = (False, -1)
+
+        if not acs_is_setup:
+            continue_without_acs = context.get_input(
+                'Could not connect to ACS cluster. Continue with cluster mode anyway (y/N)? ')
+            continue_without_acs = continue_without_acs.strip().lower()
+            if continue_without_acs != 'y' and continue_without_acs != 'yes':
+                print(
+                    "Aborting switch to cluster mode. Please run 'az ml env about' for more information on setting up your cluster.")  # pylint: disable=line-too-long
+                return
+
+        conf['port'] = port
+
     conf['mode'] = 'cluster'
-    conf['port'] = port
     context.write_config(conf)
 
     print("Running in cluster mode.")
@@ -270,13 +277,16 @@ def env_describe(context=CommandLineInterfaceContext()):
         print('HDI cluster URL        : {}'.format(context.hdi_home))
         print('HDI admin user name    : {}'.format(context.hdi_user))
         print('HDI admin password     : {}'.format(context.hdi_pw))
-        print('ACS Master URL         : {}'.format(context.acs_master_url))
-        print('ACS Agent URL          : {}'.format(context.acs_agent_url))
-        forwarded_port = check_marathon_port_forwarding(context)
-        if forwarded_port > 0:
-            print('ACS Port forwarding    : ON, port {}'.format(forwarded_port))
+        if context.env_is_k8s:
+            print('Using Kubernetes       : {}'.format(os.environ.get('AML_ACS_IS_K8S')))
         else:
-            print('ACS Port forwarding    : OFF')
+            print('ACS Master URL         : {}'.format(context.acs_master_url))
+            print('ACS Agent URL          : {}'.format(context.acs_agent_url))
+            forwarded_port = check_marathon_port_forwarding(context)
+            if forwarded_port > 0:
+                print('ACS Port forwarding    : ON, port {}'.format(forwarded_port))
+            else:
+                print('ACS Port forwarding    : OFF')
 
 
 def env_local(verb, context=CommandLineInterfaceContext()):

@@ -46,7 +46,7 @@ setup(
     long_description=README + '\n\n' + HISTORY,
     license='MIT',
     author='Microsoft Corporation',
-    author_email='deployml@microsoft.com',
+    author_email='azpycli@microsoft.com',
     url='https://github.com/Azure/azure-cli',
     classifiers=CLASSIFIERS,
     namespace_packages=[

@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: Service
+metadata:
+  # Name of the service
+  name: null
+  labels:
+    webservicename: null
+    webservicetype: null
+    isazuremlapp: "true"
+    azuremlappname: null
+spec:
+  type: NodePort
+  ports:
+    # the port that this service should serve on
+    - port: 5001
+      protocol: TCP
+  selector:
+    # App name of the deployment it's trying to expose
+    webservicename: null
