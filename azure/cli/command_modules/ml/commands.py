@@ -31,7 +31,3 @@ cli_command(__name__, 'ml service list realtime', 'azure.cli.command_modules.ml.
 cli_command(__name__, 'ml service view realtime', 'azure.cli.command_modules.ml.service.realtime#realtime_service_view')
 cli_command(__name__, 'ml service delete realtime', 'azure.cli.command_modules.ml.service.realtime#realtime_service_delete')
 cli_command(__name__, 'ml service run realtime', 'azure.cli.command_modules.ml.service.realtime#realtime_service_run')
-#
-# cli_command(__name__, 'ml email', 'azure.cli.command_modules.ml._az_util#az_get_active_email')
-# cli_command(__name__, 'ml kube', 'azure.cli.command_modules.ml._az_util#az_install_kubectl')
-cli_command(__name__, 'ml k8s', 'azure.cli.command_modules.ml._az_util#az_create_kubernetes')
