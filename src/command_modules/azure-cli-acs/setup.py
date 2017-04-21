@@ -29,6 +29,7 @@ DEPENDENCIES = [
     'azure-mgmt-compute==1.0.0rc1',
     'azure-graphrbac==0.30.0rc6',
     'azure-cli-core',
+    'cryptography',
     'paramiko',
     'pyyaml',
     'six',
