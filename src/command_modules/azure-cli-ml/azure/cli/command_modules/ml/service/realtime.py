@@ -37,8 +37,8 @@ from ._docker_utils import check_docker_credentials
 from ._realtimeutilities import RealtimeConstants
 from ._realtimeutilities import resolve_marathon_base_url
 from ._realtimeutilities import get_sample_data
-from ._realtimeutilities import try_add_sample_file
 from ._realtimeutilities import upload_dependency
+from ._realtimeutilities import get_service_swagger_spec
 
 # Local mode functions
 
@@ -170,9 +170,9 @@ def realtime_service_deploy_local(context, image, verbose, app_insights_enabled,
             print('[Local mode] Failed to start container. Please report this to deployml@microsoft.com with your image id: {}'.format(image)) #pylint: disable=line-too-long
             return
 
-        sample_data_available = get_sample_data('http://127.0.0.1:{}/sample'.format(dockerport), None, verbose)
-        input_data = "'{{\"input\":\"{}\"}}'"\
-            .format(sample_data_available if sample_data_available else '!! YOUR DATA HERE !!')
+        swagger_uri = RealtimeConstants.swagger_uri_format.format("127.0.0.1:{}".format(dockerport))
+        sample_data_available = get_sample_data(swagger_uri, None, verbose)
+        input_data = "{0}".format(sample_data_available if sample_data_available else '!! YOUR DATA HERE !!')
         print("[Local mode] Success.")
         print('[Local mode] Scoring endpoint: http://127.0.0.1:{}/score'.format(dockerport))
         print("[Local mode] Usage: az ml service run realtime -n " + service_label + " [-d {}]".format(input_data))
@@ -196,14 +196,14 @@ def realtime_service_run_local(service_name, input_data, verbose):
         headers = {'Content-Type': 'application/json'}
         if input_data == '':
             print("No input data specified. Checking for sample data.")
-            sample_url = 'http://127.0.0.1:{}/sample'.format(container_port)
-            sample_data = get_sample_data(sample_url, headers, verbose)
-            input_data = '{{"input":"{}"}}'.format(sample_data)
+            swagger_uri = RealtimeConstants.swagger_uri_format.format("127.0.0.1:{}".format(container_port))
+            sample_data = get_sample_data(swagger_uri, headers, verbose)
             if not sample_data:
                 print(
                     "No sample data available. To score with your own data, run: az ml service run realtime -n {} -d <input_data>" #pylint: disable=line-too-long
                     .format(service_name))
                 return
+            input_data = sample_data
             print('Using sample data: ' + input_data)
         else:
             if verbose:
@@ -396,7 +396,7 @@ def realtime_service_delete(service_name, verb, context=cli_context):
     return
 
 
-def realtime_service_create(score_file, dependencies, requirements, schema_file, service_name,
+def realtime_service_create(score_file, dependencies, requirements, in_schema, out_schema, service_name,
                             verb, custom_ice_url, target_runtime, logging_level, model, context=cli_context):
     """Create a new realtime web service."""
 
@@ -466,15 +466,13 @@ def realtime_service_create(score_file, dependencies, requirements, schema_file,
     utilities_filename = resource_filename(__name__, 'azuremlutilities.py')
     dependencies.append(utilities_filename)
 
-    # If a schema file was provided, try to find the accompanying sample file
-    # and add as a dependency
-    get_sample_code = ''
-    if schema_file is not '':
-        dependencies.append(schema_file)
-        sample_added, sample_filename = try_add_sample_file(dependencies, schema_file, verbose)
-        if sample_added:
-            get_sample_code = \
-                resource_string(__name__, 'data/getsample.py').decode('ascii').replace('PLACEHOLDER', sample_filename)
+    # Check if user has provided schema files for input / output and if so use them to
+    # generate the swagger specification for the service
+    swagger_spec_filepath = 'swagger.json'
+    swagger_spec = get_service_swagger_spec(in_schema, out_schema)
+    with open(swagger_spec_filepath, 'w') as f:
+        json.dump(swagger_spec, f)
+    dependencies.append(swagger_spec_filepath)
 
     if requirements is not '':
         if verbose:
@@ -536,9 +534,9 @@ def realtime_service_create(score_file, dependencies, requirements, schema_file,
                       context.az_account_name + ".blob.core.windows.net','" + context.az_account_key + "')"
 
         # create blob with preamble code and user function definitions from cell
-        code = "{}\n{}\n{}\n{}\n\n\n{}".format(preamble, wasb_config, dependency_injection_code, code, get_sample_code)
+        code = "{}\n{}\n{}\n{}\n".format(preamble, wasb_config, dependency_injection_code, code)
     else:
-        code = "{}\n{}\n\n\n{}".format(dependency_injection_code, code, get_sample_code)
+        code = "{}\n{}\n".format(dependency_injection_code, code)
 
     if verbose:
         print(code)
@@ -655,6 +653,10 @@ def realtime_service_create(score_file, dependencies, requirements, schema_file,
 
     print('done.')
     print('Image available at : {}'.format(acs_payload['container']['docker']['image']))
+
+    # Cleanup
+    os.remove(swagger_spec_filepath)
+
     if context.in_local_mode():
         return realtime_service_deploy_local(context, image, verbose, app_insights_enabled, logging_level)
     else:
@@ -771,15 +773,16 @@ def realtime_service_view(service_name=None, verb=False, context=cli_context):
                 scoring_url = 'http://127.0.0.1:' + str(scoring_port) + '/score'
 
             # Try to get the sample request from the container
-            sample_url = 'http://127.0.0.1:' + str(scoring_port) + '/sample'
+
+            service_host = '127.0.0.1:' + str(scoring_port)
             headers = {'Content-Type':'application/json'}
         else:
             print('[Local mode] Error: Misconfigured container. Cannot determine scoring port.')
             return
     else:
         if context.acs_agent_url is not None:
+            service_host = context.acs_agent_url + ':9091'
             scoring_url = 'http://' + context.acs_agent_url + ':9091/score'
-            sample_url = 'http://' + context.acs_agent_url + ':9091/sample'
             headers = {'Content-Type': 'application/json', 'X-Marathon-App-Id': "/{}".format(service_name)}
             usage_headers.append('-H "X-Marathon-App-Id:/{}"'.format(service_name))
         else:
@@ -787,9 +790,9 @@ def realtime_service_view(service_name=None, verb=False, context=cli_context):
                   'Please ensure that AML_ACS_AGENT environment variable is set.')
             return
 
-    service_sample_data = get_sample_data(sample_url, headers, verbose)
-    sample_data = '{{"input":"{}"}}'.format(
-        service_sample_data if service_sample_data is not None else default_sample_data)
+    swagger_uri = RealtimeConstants.swagger_uri_format.format(service_host)
+    service_sample_data = get_sample_data(swagger_uri, headers, verbose)
+    sample_data = service_sample_data if service_sample_data is not None else default_sample_data
     print('Usage:')
     print('  az ml  : az ml service run realtime -n {} [-d \'{}\']'.format(service_name, sample_data))
     print('  curl : curl -X POST {} --data \'{}\' {}'.format(' '.join(usage_headers), sample_data, scoring_url))
@@ -928,8 +931,8 @@ def realtime_service_run_cluster(context, service_name, input_data, verbose):
     headers = {'Content-Type': 'application/json', 'X-Marathon-App-Id': "/{}".format(service_name)}
 
     if input_data == '':
-        sample_url = 'http://' + context.acs_agent_url + ':9091/sample'
-        sample_data = get_sample_data(sample_url, headers, verbose)
+        swagger_uri = RealtimeConstants.swagger_uri_format.format("{}:9091".format(context.acs_agent_url))
+        sample_data = get_sample_data(swagger_uri, headers, verbose)
 
         if sample_data is None:
             print('No such service {}'.format(service_name))
@@ -940,7 +943,7 @@ def realtime_service_run_cluster(context, service_name, input_data, verbose):
                 .format(service_name))
             return
 
-        input_data = '{{"input":"{}"}}'.format(sample_data)
+        input_data = sample_data
         print('Using sample data: ' + input_data)
 
     marathon_url = 'http://' + context.acs_agent_url + ':9091/score'

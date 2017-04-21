@@ -11,13 +11,12 @@ Utilities to create and manage realtime web services.
 
 from __future__ import print_function
 
-from datetime import datetime, timedelta
 import os
 import tarfile
 import uuid
 import requests
+import json
 
-from azure.storage.blob import (BlockBlobService, ContentSettings, BlobPermissions)
 from .._util import InvalidConfError
 from .._util import is_int
 
@@ -27,6 +26,8 @@ class RealtimeConstants(object):
     ninja_runtimes = ['mrs']
     supported_logging_levels = ['none', 'info', 'debug', 'warn', 'trace']
     create_cmd_sample = "az ml service create realtime -f <webservice file> -n <service name> [-m <model1> [-m <model2>] ...] [-p requirements.txt] [-s <schema>] [-r {0}] [-l {1}]".format("|".join(supported_runtimes), "|".join(supported_logging_levels))  # pylint: disable=line-too-long
+
+    swagger_uri_format = 'http://{0}/swagger.json'
 
 
 def upload_dependency(context, dependency, verbose):
@@ -64,31 +65,6 @@ def upload_dependency(context, dependency, verbose):
         return 1, package_location, az_blob_name
 
 
-def try_add_sample_file(dependencies, schema_file, verbose):
-    """
-       Tries to find a sample file named after the given
-       schema file. If found, adds it to the dependencies list.
-    """
-
-    if not os.path.exists(schema_file):
-        if verbose:
-            print("Error: no such path {}".format(schema_file))
-        return False, ''
-    else:
-        sample_file = schema_file + '.sample'
-        if not os.path.exists(sample_file):
-            if verbose:
-                print("No sample found named {}".format(sample_file))
-            return False, ''
-        if verbose:
-            print("Adding {} to dependencies.".format(sample_file))
-        dependencies.append(sample_file)
-
-        # Return the basename of the file only, since dependencies
-        # are always placed in the current directory inside the container
-        return True, os.path.basename(sample_file.strip('/'))
-
-    
 def check_marathon_port_forwarding(context):
     """
 
@@ -132,7 +108,7 @@ def resolve_marathon_base_url(context):
 def get_sample_data(sample_url, headers, verbose):
     """
     Try to retrieve sample data for the given service.
-    :param sample_url: The url to the service
+    :param sample_url: The url to the service's swagger definition
     :param headers: The headers to pass in the call
     :param verbose: Whether to print debugging info or not.
     :return: str - sample data if available, '' if not available, None if the service does not exist.
@@ -141,30 +117,55 @@ def get_sample_data(sample_url, headers, verbose):
     if verbose:
         print('[Debug] Fetching sample data from: {}'.format(sample_url))
     try:
-        sample_data = requests.get(sample_url, headers=headers)
+        swagger_spec_response = requests.get(sample_url, headers=headers)
     except requests.ConnectionError:
         if verbose:
             print('[Debug] Could not connect to sample data endpoint on this container.')
         return default_retval
 
-    if sample_data.status_code == 404:
+    if swagger_spec_response.status_code == 404:
         if verbose:
             print('[Debug] Received a 404 - no sample route on this service.')
         return ''
-    elif sample_data.status_code == 503:
+    elif swagger_spec_response.status_code == 503:
         if verbose:
             print('[Debug] Received a 503 - no such service.')
         return default_retval
-    elif sample_data.status_code != 200:
+    elif swagger_spec_response.status_code != 200:
         if verbose:
-            print('[Debug] Received {} - treating as no such service.'.format(sample_data.status_code))
+            print('[Debug] Received {} - treating as no such service.'.format(swagger_spec_response.status_code))
         return default_retval
 
     try:
-        sample_data = sample_data.json()
+        input_swagger = swagger_spec_response.json()['definitions']['ServiceInput']
+        if 'example' in input_swagger:
+            sample_data = input_swagger['example']
+            return str(sample_data)
+        else:
+            return default_retval
     except ValueError:
         if verbose:
-            print('[Debug] Could not deserialize sample data. Malformed json {}.'.format(sample_data))
+            print('[Debug] Could not deserialize swagger spec. Malformed json {}.'.format(swagger_spec_response))
         return default_retval
 
-    return str(sample_data)
+
+def get_service_swagger_spec(input_schema, output_schema):
+    with open('data/service-swagger-template.json', 'r') as f:
+        swagger_spec = json.load(f)
+    if input_schema is not '':
+        swagger_spec['definitions']['ServiceInput'] = _get_swagger_from_schema_file(input_schema, 'input')
+    if output_schema is not '':
+        swagger_spec['definitions']['ServiceOutput'] = _get_swagger_from_schema_file(output_schema, 'output')
+
+    return swagger_spec
+
+
+def _get_swagger_from_schema_file(schema_file_path, schema_type):
+    if not (os.path.exists(schema_file_path) and os.path.isfile(schema_file_path)):
+        raise ValueError("Invalid {0} schema file path: {1}. Value must point to an existing file.".format(
+            schema_type, schema_file_path))
+    with open(schema_file_path, 'r') as f:
+        full_schema = json.load(f)
+    if 'swagger' not in full_schema:
+        raise ValueError("Invalid {0} schema content: missing 'swagger' element".format(schema_type))
+    return full_schema['swagger']

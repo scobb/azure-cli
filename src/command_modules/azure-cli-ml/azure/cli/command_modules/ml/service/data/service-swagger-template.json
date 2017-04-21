@@ -1,0 +1,68 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "title": "API specification for AML service $SERVICE_NAME$",
+    "description": "",
+    "version": "1.0"
+  },
+  "schemes": [
+    "https"
+  ],
+  "consumes": [
+    "application/json"
+  ],
+  "produces": [
+    "application/json"
+  ],
+  "paths": {
+    "/": {
+      "get": {
+        "operationId": "ServiceHealthCheck",
+        "description": "Simple health check endpoint to ensure the service is up at any given point.",
+        "responses": {
+          "200": {
+            "description": "If service is up and running, this response will be returned with the content 'Healthy'",
+            "schema": {
+              "type": "string"
+            },
+            "examples": {
+              "application/json": "Healthy"
+            }
+          }
+        }
+      }
+    },
+    "/score": {
+      "post": {
+        "operationId": "ScoreMLService",
+        "description": "Run web service's model and get the prediction output",
+        "parameters": [
+          {
+            "name": "serviceInputPayload",
+            "in": "body",
+            "description": "The input payload for executing the real-time machine learning service.",
+            "schema": {
+              "$ref": "#/definitions/ServiceInput"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The service processed the input correctly and provided a result prediction, if applicable.",
+            "schema": {
+              "$ref": "#/definitions/ServiceOutput"
+            }
+          }
+        }
+      }
+    }
+  },
+  "definitions": {
+    "ServiceInput": {
+      "type": "string"
+    },
+    "ServiceOutput": {
+      "type": "string"
+    }
+  }
+}
