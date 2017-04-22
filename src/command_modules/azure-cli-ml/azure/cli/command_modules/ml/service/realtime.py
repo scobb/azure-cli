@@ -171,8 +171,9 @@ def realtime_service_deploy_local(context, image, verbose, app_insights_enabled,
             return
 
         swagger_uri = RealtimeConstants.swagger_uri_format.format("127.0.0.1:{}".format(dockerport))
-        sample_data_available = get_sample_data(swagger_uri, None, verbose)
-        input_data = "{0}".format(sample_data_available if sample_data_available else '!! YOUR DATA HERE !!')
+        input_data = get_sample_data(swagger_uri, None, verbose)
+        if not input_data:
+            input_data = RealtimeConstants.default_input_data
         print("[Local mode] Success.")
         print('[Local mode] Scoring endpoint: http://127.0.0.1:{}/score'.format(dockerport))
         print("[Local mode] Usage: az ml service run realtime -n " + service_label + " [-d {}]".format(input_data))
@@ -717,7 +718,7 @@ def realtime_service_deploy(context, image, app_id, app_insights_enabled, loggin
         m_app = m_app.json()
 
     print("Success.")
-    print("Usage: az ml service run realtime -n " + app_id + " [-d '{\"input\" : \"!! YOUR DATA HERE !!\"}']")
+    print("Usage: az ml service run realtime -n " + app_id + " [-d '" + RealtimeConstants.default_input_data + "']")
     return
 
 
@@ -732,7 +733,6 @@ def realtime_service_view(service_name=None, verb=False, context=cli_context):
 
     scoring_url = None
     usage_headers = ['-H "Content-Type:application/json"']
-    default_sample_data = '!!!YOUR DATA HERE !!!'
 
     if context.in_local_mode():
         try:
@@ -791,8 +791,9 @@ def realtime_service_view(service_name=None, verb=False, context=cli_context):
             return
 
     swagger_uri = RealtimeConstants.swagger_uri_format.format(service_host)
-    service_sample_data = get_sample_data(swagger_uri, headers, verbose)
-    sample_data = service_sample_data if service_sample_data is not None else default_sample_data
+    sample_data = get_sample_data(swagger_uri, headers, verbose)
+    if not sample_data:
+        sample_data = RealtimeConstants.default_input_data
     print('Usage:')
     print('  az ml  : az ml service run realtime -n {} [-d \'{}\']'.format(service_name, sample_data))
     print('  curl : curl -X POST {} --data \'{}\' {}'.format(' '.join(usage_headers), sample_data, scoring_url))

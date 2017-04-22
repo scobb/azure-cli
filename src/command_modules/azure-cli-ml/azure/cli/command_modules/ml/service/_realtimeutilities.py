@@ -28,6 +28,7 @@ class RealtimeConstants(object):
     create_cmd_sample = "az ml service create realtime -f <webservice file> -n <service name> [-m <model1> [-m <model2>] ...] [-p requirements.txt] [-s <schema>] [-r {0}] [-l {1}]".format("|".join(supported_runtimes), "|".join(supported_logging_levels))  # pylint: disable=line-too-long
 
     swagger_uri_format = 'http://{0}/swagger.json'
+    default_input_data = '!! YOUR DATA HERE !!'
 
 
 def upload_dependency(context, dependency, verbose):
@@ -156,7 +157,6 @@ def get_service_swagger_spec(input_schema, output_schema):
         swagger_spec['definitions']['ServiceInput'] = _get_swagger_from_schema_file(input_schema, 'input')
     if output_schema is not '':
         swagger_spec['definitions']['ServiceOutput'] = _get_swagger_from_schema_file(output_schema, 'output')
-
     return swagger_spec
 
 
