@@ -93,9 +93,9 @@ def az_login():
         profile.get_subscription()
     except CLIError as exc:
         # thrown when not logged in
-        if "'az login'" in exc.message:
+        if "'az login'" in str(exc):
             profile.find_subscriptions_on_login(True, None, None, None, None)
-        elif "'az account set'" in exc.message:
+        elif "'az account set'" in str(exc):
             # TODO - figure out what to do here..
             raise
         else:
