@@ -770,9 +770,9 @@ def create_ssh_key_if_not_exists():
     if not os.path.exists(private_key_path):
         print('Creating ssh key {}'.format(private_key_path))
         private_key, public_key = generate_ssh_keys()
-        with open(private_key_path, 'w') as private_key_file:
+        with open(private_key_path, 'wb') as private_key_file:
             private_key_file.write(private_key)
-        with open(public_key_path, 'w') as public_key_file:
+        with open(public_key_path, 'wb') as public_key_file:
             public_key_file.write(public_key)
         return private_key_path, public_key
 
