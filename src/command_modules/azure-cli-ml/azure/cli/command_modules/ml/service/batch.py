@@ -218,19 +218,26 @@ def batch_service_run(service_name, verb, inputs,
     if not job_name:
         job_name = time.strftime('%Y-%m-%d_%H%M%S')
 
+    input_output_dict = {}
     parameter_dict = {}
     valid_parameters = True
     for param in inputs:
         is_valid, k, v = validate_and_split_run_param(param)
         valid_parameters = valid_parameters and is_valid
         if valid_parameters:
-            parameter_dict[k] = v, True
+            input_output_dict[k] = v, True
 
-    for param in outputs + parameters:
+    for param in outputs:
         is_valid, k, v = validate_and_split_run_param(param)
         valid_parameters = valid_parameters and is_valid
         if valid_parameters:
-            parameter_dict[k] = v, False
+            input_output_dict[k] = v, False
+
+    for param in parameters:
+        is_valid, k, v = validate_and_split_run_param(param)
+        valid_parameters = valid_parameters and is_valid
+        if valid_parameters:
+            parameter_dict[k] = v
 
     if not valid_parameters:
         return
@@ -243,12 +250,12 @@ def batch_service_run(service_name, verb, inputs,
 
     # upload any local parameters if needed
     try:
-        parameter_dict = {param_name: update_asset_path(context, verb,
-                                                        parameter_dict[param_name][0],
-                                                        parameters_container,
-                                                        is_input=
-                                                        parameter_dict[param_name][1])[1]
-                          for param_name in parameter_dict}
+        parameter_dict.update({param_name: update_asset_path(context, verb,
+                                                             input_output_dict[param_name][0],
+                                                             parameters_container,
+                                                             is_input=
+                                                             input_output_dict[param_name][1])[1]
+                               for param_name in input_output_dict})
     except ValueError as exc:
         print('Unable to process parameters: {}'.format(exc))
         return

@@ -50,7 +50,7 @@ def check_docker_credentials(acr_home, acr_user, acr_pw, verbose):
         if 'auths' in docker_config and acr_home in docker_config['auths']:
             return
         else:
-            connection_string = base64.b64encode(bytes(acr_user + ':' + acr_pw))
+            connection_string = base64.b64encode(bytearray(acr_user + ':' + acr_pw, 'utf-8'))
             docker_auth = {'auth': connection_string.decode('ascii')}
             docker_config['auths'][acr_home] = docker_auth
             if verbose:
@@ -68,7 +68,7 @@ def add_docker_credentials(acr_home, acr_user, acr_pw, verbose):
     :param verbose: Whether to print verbose output or not
     :returns None
     """
-    connection_string = base64.b64encode(bytes(acr_user + ':' + acr_pw))
+    connection_string = base64.b64encode(bytearray(acr_user + ':' + acr_pw, 'utf-8'))
     docker_auths = {acr_home: {'auth': connection_string.decode('ascii')}}
     docker_config = {'auths': docker_auths}
     if verbose:

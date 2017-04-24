@@ -400,6 +400,7 @@ def realtime_service_create(score_file, dependencies, requirements, schema_file,
     """Create a new realtime web service."""
 
     verbose = verb
+
     if app_insights_logging_enabled:
         app_insights_enabled = 'true'
     else:
