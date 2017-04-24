@@ -186,8 +186,8 @@ def env_about():
                             for details.
     AML_ACR_USER          : Set this to the username of the above ACR.
     AML_ACR_PW            : Set this to the password of the above ACR.
-    AML_APP_INSIGHTS_NAME : Set this to an App Insights account
-    AML_APP_INSIGHTS_KEY  : Set this to an App Insights instrumentation key
+    AML_APP_INSIGHTS_NAME : Set this to an App Insights account.
+    AML_APP_INSIGHTS_KEY  : Set this to an App Insights instrumentation key.
 
 
     Cluster mode:
@@ -198,8 +198,8 @@ def env_about():
     order to use the CLI in cluster mode, define the following environment variables (in addition to those above for
     local mode):
 
-    AML_ACS_MASTER        : Set this to the URL of your ACS Master (e.g.yourclustermgmt.westus.cloudapp.azure.com)
-    AML_ACS_AGENT         : Set this to the URL of your ACS Public Agent (e.g. yourclusteragents.westus.cloudapp.azure.com)
+    AML_ACS_MASTER        : Set this to the URL of your ACS Master (e.g.yourclustermgmt.westus.cloudapp.azure.com).
+    AML_ACS_AGENT         : Set this to the URL of your ACS Public Agent (e.g. yourclusteragents.westus.cloudapp.azure.com).
     AML_HDI_CLUSTER       : Set this to the URL of your HDInsight Spark cluster.
     AML_HDI_USER          : Set this to the admin user of your HDInsight Spark cluster.
     AML_HDI_PW            : Set this to the password of the admin user of your HDInsight Spark cluster.
