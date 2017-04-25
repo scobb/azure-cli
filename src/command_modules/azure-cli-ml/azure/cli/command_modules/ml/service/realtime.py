@@ -1141,9 +1141,15 @@ def realtime_service_run_kubernetes(context, service_name, input_data, verbose):
     if verbose:
         print(result.content)
 
-    if result.status_code != 200:
+    if not result.ok:
         print('Error scoring the service.')
-        print(result.content)
+        content = result.content.decode()
+        if content == "ehostunreach":
+            print('Unable to reach the requested host.')
+            print('If you just created this service, it may not be available yet. Please try again in a few minutes.')
+        elif '%MatchError' in content:
+            print('Unable to find service with name {}'.format(service_name))
+        print(content)
         return
 
     try:
