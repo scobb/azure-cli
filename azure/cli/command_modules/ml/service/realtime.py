@@ -45,6 +45,7 @@ from ._realtimeutilities import upload_dependency
 from ._realtimeutilities import get_k8s_frontend_url
 from ._realtimeutilities import test_acs_k8s
 from .._k8s_util import KubernetesOperations
+from .._k8s_util import check_for_kubectl
 from kubernetes.client.rest import ApiException
 from ...ml import __version__
 
@@ -344,6 +345,10 @@ def realtime_service_delete_kubernetes(context, service_name, verbose):
 
     k8s_ops = KubernetesOperations()
     try:
+        if not check_for_kubectl(context):
+            print('')
+            print('kubectl is required to delete webservices. Please install it on your path and try again.')
+            return
         k8s_ops.delete_service(service_name)
         k8s_ops.delete_deployment(service_name)
     except ApiException as exc:

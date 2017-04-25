@@ -24,6 +24,7 @@ from ._az_util import az_create_storage_and_acr
 from ._az_util import az_create_app_insights_account
 from ._az_util import az_create_acs
 from ._az_util import query_deployment_status
+from ._az_util import az_get_k8s_credentials
 from ._k8s_util import KubernetesOperations
 from ._k8s_util import setup_k8s
 from ..ml import __version__
@@ -250,6 +251,15 @@ def env_cluster(force_connection, forwarded_port, verb, context=CommandLineInter
                 return
 
         conf['port'] = port
+    else:
+        basename = context.az_account_name[:-4]
+        ssh_key_path = os.path.join(os.path.expanduser('~'), '.ssh', 'acs_id_rsa')
+        if not os.path.exists(ssh_key_path):
+            print('Unable to find ssh key {}. If you did not provision this Kubernetes '
+                  'environment from this machine, you may need to copy the key from '
+                  'the provisioning machine.'.format(ssh_key_path))
+            return
+        az_get_k8s_credentials('{}rg'.format(basename), '{}-cluster'.format(basename), ssh_key_path)
 
     conf['mode'] = 'cluster'
     context.write_config(conf)
