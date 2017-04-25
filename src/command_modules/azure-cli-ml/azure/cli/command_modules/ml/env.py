@@ -413,11 +413,15 @@ def env_setup(status, name, kubernetes, context=CommandLineInterfaceContext()):
         ('Storage Key', context.az_account_key)]
     ), az_create_storage_and_acr, [root_name, resource_group])
 
+    env_verb = 'export' if context.os_is_linux() else 'set'
+    env_statements = []
     if kubernetes:
-        create_action_with_prompt_if_defined(context, 'Kubernetes Cluster', OrderedDict([
+        k8s_configured = create_action_with_prompt_if_defined(context, 'Kubernetes Cluster', OrderedDict([
             ('Kubernetes Cluster Name', KubernetesOperations.get_cluster_name(context))
         ]), setup_k8s, [context, root_name, resource_group, acr_login_server,
                         acr_password, ssh_public_key, ssh_private_key_path])
+        if k8s_configured is True:
+            env_statements.append('{} AML_ACS_IS_K8S=True'.format(env_verb))
     else:
         create_action_with_prompt_if_defined(context, 'ACS', OrderedDict([
             ('ACS Master URL', context.acs_master_url),
@@ -425,11 +429,8 @@ def env_setup(status, name, kubernetes, context=CommandLineInterfaceContext()):
         ), az_create_acs, [root_name, resource_group, acr_login_server,
                            context.acr_username, acr_password, ssh_public_key])
 
-    env_verb = 'export' if context.os_is_linux() else 'set'
-    env_statements = []
-
     if isinstance(app_insights_deployment_id, types.GeneratorType):
-        env_statements = ["{} AML_APP_INSIGHTS_NAME={}".format(env_verb, app_insights_deployment_id.next()),
+        env_statements += ["{} AML_APP_INSIGHTS_NAME={}".format(env_verb, app_insights_deployment_id.next()),
                           "{} AML_APP_INSIGHTS_KEY={}".format(env_verb, app_insights_deployment_id.next())]
 
     else:
@@ -444,7 +445,7 @@ def env_setup(status, name, kubernetes, context=CommandLineInterfaceContext()):
                 break
         if completed_deployment:
             app_insights_account_name, app_insights_account_key = az_get_app_insights_account(completed_deployment)
-            env_statements = ["{} AML_APP_INSIGHTS_NAME={}".format(env_verb, app_insights_account_name),
+            env_statements += ["{} AML_APP_INSIGHTS_NAME={}".format(env_verb, app_insights_account_name),
                       "{} AML_APP_INSIGHTS_KEY={}".format(env_verb, app_insights_account_key)]
 
 
@@ -477,7 +478,7 @@ def create_action_with_prompt_if_defined(context, action_str, env_dict, action, 
         print('Found existing {} set up.'.format(action_str))
         for key in env_dict:
             print('{0:30}: {1}'.format(key, env_dict[key]))
-        answer = context.get_input('Setup a new {} instead (y/N)?'.format(action_str))
+        answer = context.get_input('Set up a new {} instead (y/N)?'.format(action_str))
         if answer != 'y' and answer != 'yes':
             print('Continuing with configured {}.'.format(action_str))
             return (env_dict[key] for key in env_dict)
