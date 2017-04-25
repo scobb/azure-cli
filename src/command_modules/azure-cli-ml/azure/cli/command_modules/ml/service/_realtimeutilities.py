@@ -126,7 +126,7 @@ def get_sample_data(sample_url, headers, verbose):
 
     if swagger_spec_response.status_code == 404:
         if verbose:
-            print('[Debug] Received a 404 - no sample route on this service.')
+            print('[Debug] Received a 404 - no swagger specification for this service.')
         return ''
     elif swagger_spec_response.status_code == 503:
         if verbose:
