@@ -203,6 +203,7 @@ def env_about():
     AML_HDI_CLUSTER       : Set this to the URL of your HDInsight Spark cluster.
     AML_HDI_USER          : Set this to the admin user of your HDInsight Spark cluster.
     AML_HDI_PW            : Set this to the password of the admin user of your HDInsight Spark cluster.
+    AML_ACS_IS_K8S        ; Set this to 'true' if the ACS cluster is running Kubernetes
     """)
 
 
