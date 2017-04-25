@@ -42,6 +42,7 @@ from ._acs_util import _validate_service_principal
 from ._acs_util import _build_service_principal
 from ._acs_util import store_acs_service_principal
 from ._acs_util import _create_kubernetes
+from ._acs_util import _add_role_assignment
 
 
 from azure.cli.core.util import get_file_json
@@ -409,6 +410,9 @@ def az_create_kubernetes(resource_group, cluster_name, dns_prefix, ssh_key_value
                                                      client_secret)
         logger.info('Created a service principal: %s', service_principal)
         store_acs_service_principal(subscription_id, client_secret, service_principal)
+    if not _add_role_assignment('Contributor', service_principal):
+        raise CLIError(
+            'Could not create a service principal with the right permissions. Are you an Owner on this project?')
     return _create_kubernetes(resource_group, cluster_name, dns_prefix,
                               cluster_name,
                               ssh_key_value,

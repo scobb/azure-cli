@@ -290,7 +290,7 @@ class KubernetesOperations:
             print("Deleting replicaset for deployment {}".format(deployment_name))
 
             # Pipe output of get_rs_proc to grep_named_rs_row_proc
-            get_rs_output = subprocess.check_output(['kubectl', 'get', 'rs'])
+            get_rs_output = subprocess.check_output(['kubectl', 'get', 'rs']).decode('utf-8')
             rs_regex = r'(?P<rs_name>{}-[0-9]+)'.format(deployment_name)
             s = re.search(rs_regex, get_rs_output)
             if s:
