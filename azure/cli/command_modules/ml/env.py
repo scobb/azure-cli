@@ -450,11 +450,11 @@ def env_setup(status, name, kubernetes, context=CommandLineInterfaceContext()):
 
     print('To configure az ml for local use with this environment, set the following environment variables.')
 
-    env_statements += ["{} AML_STORAGE_ACCT_NAME='{}'".format(env_verb, storage_account_name),
-                       "{} AML_STORAGE_ACCT_KEY='{}'".format(env_verb, storage_account_key),
-                       "{} AML_ACR_HOME='{}'".format(env_verb, acr_login_server),
-                       "{} AML_ACR_USER='{}'".format(env_verb, context.acr_username),
-                       "{} AML_ACR_PW='{}'".format(env_verb, acr_password)]
+    env_statements += ["{} AML_STORAGE_ACCT_NAME={}".format(env_verb, storage_account_name),
+                       "{} AML_STORAGE_ACCT_KEY={}".format(env_verb, storage_account_key),
+                       "{} AML_ACR_HOME={}".format(env_verb, acr_login_server),
+                       "{} AML_ACR_USER={}".format(env_verb, context.acr_username),
+                       "{} AML_ACR_PW={}".format(env_verb, acr_password)]
     print('\n'.join([' {}'.format(statement) for statement in env_statements]))
 
     try:
