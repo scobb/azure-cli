@@ -651,6 +651,7 @@ def realtime_service_create(score_file, dependencies, requirements, schema_file,
         try:
             ice_put_result = requests.put(
                 create_url, headers=headers, data=json.dumps(json_payload), timeout=ice_connection_timeout)
+            break
         except (requests.ConnectionError, requests.exceptions.ReadTimeout):
             if try_number < max_retries:
                 try_number += 1
@@ -777,7 +778,7 @@ def realtime_service_deploy_k8s(context, image, app_id, app_insights_enabled, lo
                                      'data', 'kubernetes_deployment_template.yaml')
     k8s_service_template_path = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                                              'data', 'kubernetes_service_template.yaml')
-    _, tmp_k8s_path = tempfile.mkstemp()
+    k8s_fd, tmp_k8s_path = tempfile.mkstemp()
     num_replicas = int(num_replicas)
 
     try:
@@ -808,10 +809,11 @@ def realtime_service_deploy_k8s(context, image, app_id, app_insights_enabled, lo
         k8s_ops.create_service(k8s_service_template_path, app_id, 'realtime')
 
         print("Success.")
-        print("Usage: aml service run realtime -n " + app_id + " [-d '{\"input\" : \"!! YOUR DATA HERE !!\"}']")
+        print("Usage: az ml service run realtime -n " + app_id + " [-d '{\"input\" : \"!! YOUR DATA HERE !!\"}']")
     except ApiException as exc:
         print("An exception occurred while deploying the service. {}".format(exc))
     finally:
+        os.close(k8s_fd)
         os.remove(tmp_k8s_path)
 
 
