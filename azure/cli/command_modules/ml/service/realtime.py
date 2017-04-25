@@ -1069,6 +1069,7 @@ def realtime_service_list_kubernetes(context, service_name=None, verbose=False):
             app_entry = [app_name, app_image, app_status, app_instances, app_health]
             app_table.append(app_entry)
         print(tabulate.tabulate(app_table, headers='firstrow', tablefmt='psql'))
+        return len(app_table) - 1
     else:
         if service_name:
             print('No service running with name {} on your ACS cluster'.format(service_name))
