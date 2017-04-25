@@ -149,6 +149,7 @@ class KubernetesOperations:
             return api_response.items[0]
         except ApiException as e:
             print("Exception occurred while getting a namespaced service. {}".format(e))
+            raise
 
     def delete_service(self, webservicename):
         """
