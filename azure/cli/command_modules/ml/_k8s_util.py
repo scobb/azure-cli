@@ -362,9 +362,6 @@ def setup_k8s(context, root_name, resource_group, acr_login_server, acr_password
         print("An unexpected exception has occurred. {}".format(exc.message))
         return False
 
-    with open(os.path.expanduser('~/.amlenvrc'), 'w+') as env_file:
-        env_file.write("export AML_ACS_IS_K8S='True'\n")
-
     return True
 
 
