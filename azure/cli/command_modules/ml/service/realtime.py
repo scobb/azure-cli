@@ -467,7 +467,7 @@ def realtime_service_create(score_file, dependencies, requirements, schema_file,
                   'please contact deployml@microsoft.com to troubleshoot.')
             print('')
     else:
-        acs_exists = context.acs_master_url is None or context.acs_agent_url is None
+        acs_exists = context.acs_master_url and context.acs_agent_url
         if not acs_exists:
             print("")
             print("Please set up your ACS cluster for AML:")
@@ -821,7 +821,7 @@ def realtime_service_view(service_name=None, verb=False, context=cli_context):
     verbose = verb
 
     # First print the list view of this service
-    realtime_service_list(service_name, verb, context)
+    num_services = _realtime_service_list(service_name, verb, context)
 
     scoring_url = None
     usage_headers = ['-H "Content-Type:application/json"']
@@ -894,12 +894,17 @@ def realtime_service_view(service_name=None, verb=False, context=cli_context):
     service_sample_data = get_sample_data(sample_url, headers, verbose)
     sample_data = '{{"input":"{}"}}'.format(
         service_sample_data if service_sample_data is not None else default_sample_data)
-    print('Usage:')
-    print('  az ml  : az ml service run realtime -n {} [-d \'{}\']'.format(service_name, sample_data))
-    print('  curl : curl -X POST {} --data \'{}\' {}'.format(' '.join(usage_headers), sample_data, scoring_url))
+    if num_services:
+        print('Usage:')
+        print('  az ml  : az ml service run realtime -n {} [-d \'{}\']'.format(service_name, sample_data))
+        print('  curl : curl -X POST {} --data \'{}\' {}'.format(' '.join(usage_headers), sample_data, scoring_url))
 
 
 def realtime_service_list(service_name=None, verb=False, context=cli_context):
+    _realtime_service_list(service_name, verb, context)
+
+
+def _realtime_service_list(service_name=None, verb=False, context=cli_context):
     """List published realtime web services."""
 
     verbose = verb
@@ -967,12 +972,11 @@ def realtime_service_list(service_name=None, verb=False, context=cli_context):
                 app_table.append(app_entry)
             print(tabulate.tabulate(app_table, headers='firstrow', tablefmt='psql'))
 
-        return
+            return len(app_table) - 1
 
     # Cluster mode
     if context.env_is_k8s:
-        realtime_service_list_kubernetes(context, service_name, verbose)
-        return
+        return realtime_service_list_kubernetes(context, service_name, verbose)
 
     if service_name is not None:
         extra_filter_expr = ", AMLID=={}".format(service_name)
@@ -1020,6 +1024,7 @@ def realtime_service_list(service_name=None, verb=False, context=cli_context):
             app_entry.append(app_health)
             app_table.append(app_entry)
         print(tabulate.tabulate(app_table, headers='firstrow', tablefmt='psql'))
+        return len(app_table) - 1
     else:
         if service_name:
             print('No service running with name {} on your ACS cluster'.format(service_name))
@@ -1112,6 +1117,13 @@ def realtime_service_run_cluster(context, service_name, input_data, verbose):
 
 
 def realtime_service_run_kubernetes(context, service_name, input_data, verbose):
+    ops = KubernetesOperations()
+    try:
+        ops.get_service(service_name)
+    except ApiException:
+        print("Unable to find service with name {}".format(service_name))
+        return
+
     headers = {'Content-Type': 'application/json'}
     try:
         frontend_service_url = get_k8s_frontend_url()

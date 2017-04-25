@@ -352,6 +352,18 @@ def env_setup(status, name, kubernetes, context=CommandLineInterfaceContext()):
                     else:
                         write_acs_to_amlenvrc(acs_master, acs_agent, "set")
 
+                    try:
+                        with open(os.path.join(os.path.expanduser('~'), '.ssh', 'config'), 'a+') as sshconf:
+                            sshconf.write('Host {}\n'.format(acs_master))
+                            sshconf.write('    HostName {}\n'.format(acs_master))
+                            sshconf.write('    User acsadmin\n')
+                            sshconf.write('    IdentityFile ~/.ssh/acs_id_rsa\n')
+                    except:
+                        print('Failed to update ~/.ssh/config. '
+                              'You will need to manually update your '
+                              '.ssh/config to look for ~/.ssh/acs_id_rsa '
+                              'for host {}'.format(acs_master))
+
                     print("To switch to cluster mode, run 'az ml env cluster'.")
             except AzureCliError as exc:
                 print(exc.message)
