@@ -7,6 +7,14 @@
 
 from codecs import open
 from setuptools import setup
+import unittest
+
+
+def my_test_suite():
+    test_loader = unittest.TestLoader()
+    test_suite = test_loader.discover('tests/e2e_tests', pattern='*_tests.py')
+    return test_suite
+
 
 VERSION = '0.1.0a5'
 
@@ -63,4 +71,9 @@ setup(
         '': ['data/*', 'service/data/*', 'service/*']
     },
     install_requires=DEPENDENCIES,
+    tests_require=[
+        'mock',
+        'nose'
+    ],
+    test_suite='nose.collector',
 )
