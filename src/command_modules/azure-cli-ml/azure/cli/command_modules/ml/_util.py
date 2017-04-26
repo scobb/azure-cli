@@ -261,6 +261,24 @@ class CommandLineInterfaceContext(object):
     def check_call(cmd, **kwargs):
         return subprocess.check_call(cmd, **kwargs)
 
+    def check_marathon_port_forwarding(self):
+        """
+
+        :return: int -1 if not set up, port if set up
+        """
+
+        try:
+            conf = self.read_config()
+            if not conf:
+                return -1
+        except InvalidConfError:
+            return -1
+
+        if 'port' in conf and is_int(conf['port']):
+            return int(conf['port'])
+
+        return -1
+
 
 class JupyterContext(CommandLineInterfaceContext):
     def __init__(self):
