@@ -765,16 +765,21 @@ def is_int(int_str):
 
 def create_ssh_key_if_not_exists():
     from ._az_util import AzureCliError
-    private_key_path = os.path.join(os.path.expanduser('~'), '.ssh', 'acs_id_rsa')
+    ssh_dir = os.path.join(os.path.expanduser('~'), '.ssh')
+    private_key_path = os.path.join(ssh_dir, 'acs_id_rsa')
     public_key_path = '{}.pub'.format(private_key_path)
     if not os.path.exists(private_key_path):
+        if not os.path.exists(ssh_dir):
+            os.makedirs(ssh_dir, 0o700)
         print('Creating ssh key {}'.format(private_key_path))
         private_key, public_key = generate_ssh_keys()
         with open(private_key_path, 'wb') as private_key_file:
             private_key_file.write(private_key)
         with open(public_key_path, 'wb') as public_key_file:
             public_key_file.write(public_key)
-        return private_key_path, public_key
+        os.chmod(private_key_path, 0o600)
+        os.chmod(public_key_path, 0o600)
+        return private_key_path, public_key.decode('ascii')
 
     try:
         with open(public_key_path, 'r') as sshkeyfile:
@@ -789,7 +794,7 @@ def create_ssh_key_if_not_exists():
             ssh_public_key = key.public_key().public_bytes(
                 crypto_serialization.Encoding.OpenSSH,
                 crypto_serialization.PublicFormat.OpenSSH
-            )
+            ).decode('ascii')
 
         except IOError:
             print('Could not load your SSH public key from {}'.format(public_key_path))
