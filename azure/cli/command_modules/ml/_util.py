@@ -770,13 +770,15 @@ def create_ssh_key_if_not_exists():
     public_key_path = '{}.pub'.format(private_key_path)
     if not os.path.exists(private_key_path):
         if not os.path.exists(ssh_dir):
-            os.makedirs(ssh_dir)
+            os.makedirs(ssh_dir, 0o700)
         print('Creating ssh key {}'.format(private_key_path))
         private_key, public_key = generate_ssh_keys()
         with open(private_key_path, 'wb') as private_key_file:
             private_key_file.write(private_key)
         with open(public_key_path, 'wb') as public_key_file:
             public_key_file.write(public_key)
+        os.chmod(private_key_path, 0o600)
+        os.chmod(public_key_path, 0o600)
         return private_key_path, public_key.decode('ascii')
 
     try:
