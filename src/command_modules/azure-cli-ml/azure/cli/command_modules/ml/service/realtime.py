@@ -397,7 +397,7 @@ def realtime_service_delete(service_name, verb, context=cli_context):
     return
 
 
-def realtime_service_create(score_file, dependencies, requirements, in_schema, out_schema, service_name,
+def realtime_service_create(score_file, dependencies, requirements, schema_file, service_name,
                             verb, custom_ice_url, target_runtime, logging_level, model, context=cli_context):
     """Create a new realtime web service."""
 
@@ -470,7 +470,7 @@ def realtime_service_create(score_file, dependencies, requirements, in_schema, o
     # Check if user has provided schema files for input / output and if so use them to
     # generate the swagger specification for the service
     swagger_spec_filepath = 'swagger.json'
-    swagger_spec = get_service_swagger_spec(in_schema, out_schema)
+    swagger_spec = get_service_swagger_spec(schema_file, service_name)
     with open(swagger_spec_filepath, 'w') as f:
         json.dump(swagger_spec, f)
     dependencies.append(swagger_spec_filepath)

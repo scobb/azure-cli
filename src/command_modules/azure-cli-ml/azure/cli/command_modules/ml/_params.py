@@ -45,10 +45,8 @@ register_cli_argument('ml service create realtime', 'requirements', options_list
 register_cli_argument('ml service create realtime', 'model', options_list=('-m',),
                       default='', help='The model to be deployed.', required=False)
 # TODO: Add documentation about schema file format
-register_cli_argument('ml service create realtime', 'in_schema', options_list=('--in-schema',), default='', required=False,
-                      help='Schema file for the input of the the web service.')
-register_cli_argument('ml service create realtime', 'out_schema', options_list=('--out-schema',), default='', required=False,
-                      help='Schema file for the output of the web service.')
+register_cli_argument('ml service create realtime', 'schema_file', options_list=('-s',), default='', required=False,
+                      help='Web service\'s schema file.')
 register_cli_argument('ml service create realtime', 'custom_ice_url', options_list=('-i',), default='', required=False,
                       help=argparse.SUPPRESS)
 register_cli_argument('ml service create realtime', 'target_runtime', options_list=('-r',), default='spark-py',

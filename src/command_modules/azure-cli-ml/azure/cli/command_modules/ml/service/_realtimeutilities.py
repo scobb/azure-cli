@@ -150,22 +150,26 @@ def get_sample_data(sample_url, headers, verbose):
         return default_retval
 
 
-def get_service_swagger_spec(input_schema, output_schema):
+def get_service_swagger_spec(schema_file_path, service_name):
     with open('data/service-swagger-template.json', 'r') as f:
         swagger_spec = json.load(f)
-    if input_schema is not '':
-        swagger_spec['definitions']['ServiceInput'] = _get_swagger_from_schema_file(input_schema, 'input')
-    if output_schema is not '':
-        swagger_spec['definitions']['ServiceOutput'] = _get_swagger_from_schema_file(output_schema, 'output')
+    swagger_spec['info']['title'] = swagger_spec['info']['title'].replace("$SERVICE_NAME$", service_name)
+
+    if schema_file_path is not '':
+        if not (os.path.exists(schema_file_path) and os.path.isfile(schema_file_path)):
+            raise ValueError("Invalid schema file path: {0}. Value must point to an existing file.".format(
+                schema_file_path))
+        with open(schema_file_path, 'r') as f:
+            full_schema = json.load(f)
+        swagger_spec['definitions']['ServiceInput'] = _get_swagger_from_schema_file(full_schema, 'input')
+        swagger_spec['definitions']['ServiceOutput'] = _get_swagger_from_schema_file(full_schema, 'output')
+
     return swagger_spec
 
 
-def _get_swagger_from_schema_file(schema_file_path, schema_type):
-    if not (os.path.exists(schema_file_path) and os.path.isfile(schema_file_path)):
-        raise ValueError("Invalid {0} schema file path: {1}. Value must point to an existing file.".format(
-            schema_type, schema_file_path))
-    with open(schema_file_path, 'r') as f:
-        full_schema = json.load(f)
-    if 'swagger' not in full_schema:
-        raise ValueError("Invalid {0} schema content: missing 'swagger' element".format(schema_type))
-    return full_schema['swagger']
+def _get_swagger_from_schema_file(full_schema, schema_type):
+    if schema_type in full_schema:
+        if 'swagger' not in full_schema[schema_type]:
+            raise ValueError("Invalid {0} schema content: missing 'swagger' element".format(schema_type))
+        return full_schema[schema_type]['swagger']
+    return None
