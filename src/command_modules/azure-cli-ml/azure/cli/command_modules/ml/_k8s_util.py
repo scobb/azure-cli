@@ -306,6 +306,9 @@ class KubernetesOperations:
             num_replicas = int(num_replicas)
             subprocess.check_call(['kubectl', 'scale', 'deployment', deployment_name,
                                    '--replicas={}'.format(num_replicas)])
+            print("If you increased the number of pods, your service may appear 'Unhealthy' when running")
+            print("az ml service list realtime")
+            print("This will return to 'Healthy' when all new pods have been created.")
         except subprocess.CalledProcessError:
             print("Unable to scale service. {}")
 
