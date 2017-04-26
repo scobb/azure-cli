@@ -15,6 +15,7 @@ import os
 import tarfile
 import uuid
 import requests
+import tempfile
 
 from .._util import InvalidConfError
 from .._util import is_int
@@ -54,7 +55,8 @@ def upload_dependency(context, dependency, verbose):
         if verbose:
             print('[Debug] name in archive: {}'.format(arcname))
         az_blob_name = str(uuid.uuid4()) + '.tar.gz'
-        tar_name = '/tmp/' + az_blob_name
+        tmpdir = tempfile.mkdtemp()
+        tar_name = os.path.join(tmpdir, az_blob_name)
         dependency_tar = tarfile.open(tar_name, 'w:gz')
         dependency_tar.add(dependency, arcname=arcname)
         dependency_tar.close()
