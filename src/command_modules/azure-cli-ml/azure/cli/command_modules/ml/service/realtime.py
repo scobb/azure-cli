@@ -18,6 +18,9 @@ import os.path
 import sys
 import time
 import uuid
+import re
+import yaml
+import tempfile
 from datetime import datetime, timedelta
 import subprocess
 from pkg_resources import resource_filename
@@ -39,6 +42,13 @@ from ._realtimeutilities import resolve_marathon_base_url
 from ._realtimeutilities import get_sample_data
 from ._realtimeutilities import try_add_sample_file
 from ._realtimeutilities import upload_dependency
+from ._realtimeutilities import get_k8s_frontend_url
+from ._realtimeutilities import test_acs_k8s
+from .._k8s_util import KubernetesOperations
+from .._k8s_util import check_for_kubectl
+from kubernetes.client.rest import ApiException
+from ...ml import __version__
+
 
 # Local mode functions
 
@@ -327,6 +337,27 @@ def realtime_service_scale(context, args):
     return
 
 
+def realtime_service_delete_kubernetes(context, service_name, verbose):
+    response = input("Permanently delete service {} (y/N)? ".format(service_name))
+    response = response.rstrip().lower()
+    if response != 'y' and response != 'yes':
+        return
+
+    k8s_ops = KubernetesOperations()
+    try:
+        if not check_for_kubectl(context):
+            print('')
+            print('kubectl is required to delete webservices. Please install it on your path and try again.')
+            return
+        k8s_ops.delete_service(service_name)
+        k8s_ops.delete_deployment(service_name)
+    except ApiException as exc:
+        if exc.status == 404:
+            print("Unable to find web service with name {}.".format(service_name))
+            return
+        print("Exception occurred while trying to delete service {}. {}".format(service_name, exc))
+
+
 def realtime_service_delete(service_name, verb, context=cli_context):
     """Delete a realtime web service."""
 
@@ -334,6 +365,10 @@ def realtime_service_delete(service_name, verb, context=cli_context):
 
     if context.in_local_mode():
         realtime_service_delete_local(service_name, verbose)
+        return
+
+    if context.env_is_k8s:
+        realtime_service_delete_kubernetes(context, service_name, verbose)
         return
 
     if context.acs_master_url is None:
@@ -397,7 +432,8 @@ def realtime_service_delete(service_name, verb, context=cli_context):
 
 
 def realtime_service_create(score_file, dependencies, requirements, schema_file, service_name,
-                            verb, custom_ice_url, target_runtime, logging_level, model, context=cli_context):
+                            verb, custom_ice_url, target_runtime, logging_level, model, num_replicas,
+                            context=cli_context):
     """Create a new realtime web service."""
 
     verbose = verb
@@ -414,7 +450,6 @@ def realtime_service_create(score_file, dependencies, requirements, schema_file,
         return
 
     storage_exists = False
-    acs_exists = False
     acr_exists = False
 
     if context.az_account_name is None or context.az_account_key is None:
@@ -426,14 +461,24 @@ def realtime_service_create(score_file, dependencies, requirements, schema_file,
     else:
         storage_exists = True
 
-    if (context.acs_master_url is None or context.acs_agent_url is None) and (not context.in_local_mode()):
-        print("")
-        print("Please set up your ACS cluster for AML:")
-        print("  export AML_ACS_MASTER=<youracsmasterdomain>")
-        print("  export AML_ACS_AGENT=<youracsagentdomain>")
-        print("")
-    else:
+    if context.in_local_mode():
         acs_exists = True
+    elif context.env_is_k8s:
+        acs_exists = test_acs_k8s()
+        if not acs_exists:
+            print('')
+            print('Your Kubernetes cluster is not responding as expected.')
+            print('Please verify it is healthy. If you set it up via `az ml env setup,` '
+                  'please contact deployml@microsoft.com to troubleshoot.')
+            print('')
+    else:
+        acs_exists = context.acs_master_url and context.acs_agent_url
+        if not acs_exists:
+            print("")
+            print("Please set up your ACS cluster for AML:")
+            print("  export AML_ACS_MASTER=<youracsmasterdomain>")
+            print("  export AML_ACS_AGENT=<youracsagentdomain>")
+            print("")
 
     if context.acr_home is None or context.acr_user is None or context.acr_pw is None:
         print("")
@@ -444,6 +489,10 @@ def realtime_service_create(score_file, dependencies, requirements, schema_file,
         print("")
     else:
         acr_exists = True
+
+    if context.env_is_k8s and not re.match(r"[a-zA-Z0-9\.-]+", service_name):
+        print("Kubernetes Service names may only contain alphanumeric characters, '.', and '-'")
+        return
 
     if not storage_exists or not acs_exists or not acr_exists:
         return
@@ -597,16 +646,23 @@ def realtime_service_create(score_file, dependencies, requirements, schema_file,
 
     create_url = base_ice_url + '/images/' + service_name
     get_url = base_ice_url + '/jobs'
-
-    headers = {'Content-Type': 'application/json', 'User-Agent': 'aml-cli-preview-060317'}
+    headers = {'Content-Type': 'application/json', 'User-Agent': 'aml-cli-{}'.format(__version__)}
 
     image = ''
-    try:
-        ice_put_result = requests.put(
-            create_url, headers=headers, data=json.dumps(json_payload), timeout=ice_connection_timeout)
-    except (requests.ConnectionError, requests.exceptions.ReadTimeout):
-        print('Error: could not connect to Azure ML. Please try again later. If the problem persists, please contact deployml@microsoft.com') #pylint: disable=line-too-long
-        return
+    max_retries = 3
+    try_number = 0
+    ice_put_result = {}
+    while try_number < max_retries:
+        try:
+            ice_put_result = requests.put(
+                create_url, headers=headers, data=json.dumps(json_payload), timeout=ice_connection_timeout)
+            break
+        except (requests.ConnectionError, requests.exceptions.ReadTimeout):
+            if try_number < max_retries:
+                try_number += 1
+                continue
+            print('Error: could not connect to Azure ML. Please try again later. If the problem persists, please contact deployml@microsoft.com') #pylint: disable=line-too-long
+            return
 
     if ice_put_result.status_code == 401:
         print("Invalid API key. Please update your key by running 'az ml env key -u'.")
@@ -657,6 +713,8 @@ def realtime_service_create(score_file, dependencies, requirements, schema_file,
     print('Image available at : {}'.format(acs_payload['container']['docker']['image']))
     if context.in_local_mode():
         return realtime_service_deploy_local(context, image, verbose, app_insights_enabled, logging_level)
+    elif context.env_is_k8s:
+        realtime_service_deploy_k8s(context, image, service_name, app_insights_enabled, logging_level, num_replicas)
     else:
         realtime_service_deploy(context, image, service_name, app_insights_enabled, logging_level, verbose)
 
@@ -716,17 +774,61 @@ def realtime_service_deploy(context, image, app_id, app_insights_enabled, loggin
 
     print("Success.")
     print("Usage: az ml service run realtime -n " + app_id + " [-d '{\"input\" : \"!! YOUR DATA HERE !!\"}']")
-    return
+
+
+def realtime_service_deploy_k8s(context, image, app_id, app_insights_enabled, logging_level, num_replicas):
+    """Deploy a realtime Kubernetes web service from a docker image."""
+
+    k8s_template_path = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                     'data', 'kubernetes_deployment_template.yaml')
+    k8s_service_template_path = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                             'data', 'kubernetes_service_template.yaml')
+    k8s_fd, tmp_k8s_path = tempfile.mkstemp()
+    num_replicas = int(num_replicas)
+
+    try:
+        with open(k8s_template_path) as f:
+            kubernetes_app = yaml.load(f)
+    except OSError as exc:
+        print("Unable to find kubernetes deployment template file.".format(exc))
+        raise
+    kubernetes_app['metadata']['name'] = app_id + '-deployment'
+    kubernetes_app['spec']['replicas'] = num_replicas
+    kubernetes_app['spec']['template']['spec']['containers'][0]['image'] = image
+    kubernetes_app['spec']['template']['spec']['containers'][0]['name'] = app_id
+    kubernetes_app['spec']['template']['metadata']['labels']['webservicename'] = app_id
+    kubernetes_app['spec']['template']['metadata']['labels']['azuremlappname'] = app_id
+    kubernetes_app['spec']['template']['metadata']['labels']['type'] = "realtime"
+    kubernetes_app['spec']['template']['spec']['containers'][0]['env'][0]['value'] = context.app_insights_account_key
+    kubernetes_app['spec']['template']['spec']['containers'][0]['env'][1]['value'] = app_insights_enabled
+    kubernetes_app['spec']['template']['spec']['containers'][0]['env'][2]['value'] = logging_level
+    kubernetes_app['spec']['template']['spec']['imagePullSecrets'][0]['name'] = context.acr_user + 'acrkey'
+
+    with open(tmp_k8s_path, 'w') as f:
+        yaml.dump(kubernetes_app, f, default_flow_style=False)
+
+    k8s_ops = KubernetesOperations()
+    timeout_seconds = 1200
+    try:
+        k8s_ops.deploy_deployment(tmp_k8s_path, timeout_seconds, num_replicas, context.acr_user + 'acrkey')
+        k8s_ops.create_service(k8s_service_template_path, app_id, 'realtime')
+
+        print("Success.")
+        print("Usage: az ml service run realtime -n " + app_id + " [-d '{\"input\" : \"!! YOUR DATA HERE !!\"}']")
+    except ApiException as exc:
+        print("An exception occurred while deploying the service. {}".format(exc))
+    finally:
+        os.close(k8s_fd)
+        os.remove(tmp_k8s_path)
 
 
 def realtime_service_view(service_name=None, verb=False, context=cli_context):
     """View details of a previously published realtime web service."""
 
     verbose = verb
-    pass_on_args = []
 
     # First print the list view of this service
-    realtime_service_list(service_name, verb, context)
+    num_services = _realtime_service_list(service_name, verb, context)
 
     scoring_url = None
     usage_headers = ['-H "Content-Type:application/json"']
@@ -777,25 +879,39 @@ def realtime_service_view(service_name=None, verb=False, context=cli_context):
             print('[Local mode] Error: Misconfigured container. Cannot determine scoring port.')
             return
     else:
-        if context.acs_agent_url is not None:
-            scoring_url = 'http://' + context.acs_agent_url + ':9091/score'
-            sample_url = 'http://' + context.acs_agent_url + ':9091/sample'
-            headers = {'Content-Type': 'application/json', 'X-Marathon-App-Id': "/{}".format(service_name)}
-            usage_headers.append('-H "X-Marathon-App-Id:/{}"'.format(service_name))
+        if context.env_is_k8s:
+            try:
+                fe_url = get_k8s_frontend_url()
+            except ApiException:
+                return
+            scoring_url = fe_url + service_name + '/score'
+            sample_url = fe_url + service_name + '/sample'
+            headers = {'Content-Type': 'application/json'}
         else:
-            print('Unable to determine ACS Agent URL. '
-                  'Please ensure that AML_ACS_AGENT environment variable is set.')
-            return
+            if context.acs_agent_url is not None:
+                scoring_url = 'http://' + context.acs_agent_url + ':9091/score'
+                sample_url = 'http://' + context.acs_agent_url + ':9091/sample'
+                headers = {'Content-Type': 'application/json', 'X-Marathon-App-Id': "/{}".format(service_name)}
+                usage_headers.append('-H "X-Marathon-App-Id:/{}"'.format(service_name))
+            else:
+                print('Unable to determine ACS Agent URL. '
+                      'Please ensure that AML_ACS_AGENT environment variable is set.')
+                return
 
     service_sample_data = get_sample_data(sample_url, headers, verbose)
     sample_data = '{{"input":"{}"}}'.format(
         service_sample_data if service_sample_data is not None else default_sample_data)
-    print('Usage:')
-    print('  az ml  : az ml service run realtime -n {} [-d \'{}\']'.format(service_name, sample_data))
-    print('  curl : curl -X POST {} --data \'{}\' {}'.format(' '.join(usage_headers), sample_data, scoring_url))
+    if num_services:
+        print('Usage:')
+        print('  az ml  : az ml service run realtime -n {} [-d \'{}\']'.format(service_name, sample_data))
+        print('  curl : curl -X POST {} --data \'{}\' {}'.format(' '.join(usage_headers), sample_data, scoring_url))
 
 
 def realtime_service_list(service_name=None, verb=False, context=cli_context):
+    _realtime_service_list(service_name, verb, context)
+
+
+def _realtime_service_list(service_name=None, verb=False, context=cli_context):
     """List published realtime web services."""
 
     verbose = verb
@@ -863,9 +979,12 @@ def realtime_service_list(service_name=None, verb=False, context=cli_context):
                 app_table.append(app_entry)
             print(tabulate.tabulate(app_table, headers='firstrow', tablefmt='psql'))
 
-        return
+            return len(app_table) - 1
 
     # Cluster mode
+    if context.env_is_k8s:
+        return realtime_service_list_kubernetes(context, service_name, verbose)
+
     if service_name is not None:
         extra_filter_expr = ", AMLID=={}".format(service_name)
     else:
@@ -912,8 +1031,50 @@ def realtime_service_list(service_name=None, verb=False, context=cli_context):
             app_entry.append(app_health)
             app_table.append(app_entry)
         print(tabulate.tabulate(app_table, headers='firstrow', tablefmt='psql'))
+        return len(app_table) - 1
     else:
-        print('No running services on your ACS cluster.')
+        if service_name:
+            print('No service running with name {} on your ACS cluster'.format(service_name))
+        else:
+            print('No running services on your ACS cluster')
+
+
+def realtime_service_list_kubernetes(context, service_name=None, verbose=False):
+    label_selector = "type==realtime"
+    if service_name is not None:
+        label_selector += ",webservicename=={}".format(service_name)
+
+    if verbose:
+        print("label selector: {}".format(label_selector))
+
+    try:
+        k8s_ops = KubernetesOperations()
+        list_result = k8s_ops.get_filtered_deployments(label_selector)
+    except ApiException as exc:
+        print("Failed to list deployments. {}".format(exc))
+        return
+
+    if verbose:
+        print("Retrieved deployments: ")
+        print(list_result)
+
+    if len(list_result) > 0:
+        app_table = [['NAME', 'IMAGE', 'STATUS', 'INSTANCES', 'HEALTH']]
+        for app in list_result:
+            app_image = app.spec.template.spec.containers[0].image
+            app_name = app.metadata.labels['webservicename']
+            app_status = app.status.conditions[0].type
+            app_instances = app.status.replicas
+            app_health = 'Healthy' if app.status.unavailable_replicas is None else 'Unhealthy'
+            app_entry = [app_name, app_image, app_status, app_instances, app_health]
+            app_table.append(app_entry)
+        print(tabulate.tabulate(app_table, headers='firstrow', tablefmt='psql'))
+        return len(app_table) - 1
+    else:
+        if service_name:
+            print('No service running with name {} on your ACS cluster'.format(service_name))
+        else:
+            print('No running services on your ACS cluster')
 
 
 def realtime_service_run_cluster(context, service_name, input_data, verbose):
@@ -963,6 +1124,50 @@ def realtime_service_run_cluster(context, service_name, input_data, verbose):
     print(result['result'])
 
 
+def realtime_service_run_kubernetes(context, service_name, input_data, verbose):
+    ops = KubernetesOperations()
+    try:
+        ops.get_service(service_name)
+    except ApiException:
+        print("Unable to find service with name {}".format(service_name))
+        return
+
+    headers = {'Content-Type': 'application/json'}
+    try:
+        frontend_service_url = get_k8s_frontend_url()
+    except ApiException as exc:
+        print("Unable to connect to Kubernetes Front-End service. {}".format(exc))
+        return
+    if input_data is None:
+        sample_endpoint = frontend_service_url + service_name + '/sample'
+        input_data = get_sample_data(sample_endpoint, headers, verbose)
+
+    scoring_endpoint = frontend_service_url + service_name + '/score'
+    result = requests.post(scoring_endpoint, data=input_data, headers=headers)
+    if verbose:
+        print(result.content)
+
+    if not result.ok:
+        print('Error scoring the service.')
+        content = result.content.decode()
+        if content == "ehostunreach":
+            print('Unable to reach the requested host.')
+            print('If you just created this service, it may not be available yet. Please try again in a few minutes.')
+        elif '%MatchError' in content:
+            print('Unable to find service with name {}'.format(service_name))
+        print(content)
+        return
+
+    try:
+        result = result.json()
+    except ValueError:
+        print('Error scoring the service.')
+        print(result.content)
+        return
+
+    print(result['result'])
+
+
 def realtime_service_run(service_name, input_data, verb, context=cli_context):
     """
     Execute a previously published realtime web service.
@@ -977,6 +1182,8 @@ def realtime_service_run(service_name, input_data, verb, context=cli_context):
 
     if context.in_local_mode():
         realtime_service_run_local(service_name, input_data, verbose)
+    elif context.env_is_k8s:
+        realtime_service_run_kubernetes(context, service_name, input_data, verbose)
     else:
         realtime_service_run_cluster(context, service_name, input_data, verbose)
 

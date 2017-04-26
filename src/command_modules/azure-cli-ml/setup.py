@@ -8,7 +8,7 @@
 from codecs import open
 from setuptools import setup
 
-VERSION = '0.1.1b6+dev'
+VERSION = '0.1.1b8+dev'
 
 CLASSIFIERS = [
         'Development Status :: 3 - Alpha',
@@ -21,12 +21,17 @@ CLASSIFIERS = [
 
 DEPENDENCIES = [
     'azure-cli-core',
+    'azure-graphrbac>=0.30.0rc6',
+    'azure-mgmt-compute>=1.0.0rc1',
+    'azure-mgmt-containerregistry>=0.2.0',
+    'azure-mgmt-resource>=0.30.2',
+    'azure-mgmt-storage>=1.0.0rc1',
     'azure-storage>=0.33',
-    'azure-mgmt-containerregistry==0.2.0',
-    'azure-mgmt-resource==0.30.2',
-    'azure-mgmt-storage==0.31.0',
-    'tabulate>=0.7.7',
     'future',
+    'paramiko',
+    'pyyaml',
+    'scp',
+    'tabulate>=0.7.7',
 ]
 
 with open('README.rst', 'r', encoding='utf-8') as f:
@@ -41,7 +46,7 @@ setup(
     long_description=README + '\n\n' + HISTORY,
     license='MIT',
     author='Microsoft Corporation',
-    author_email='deployml@microsoft.com',
+    author_email='azpycli@microsoft.com',
     url='https://github.com/Azure/azure-cli',
     classifiers=CLASSIFIERS,
     namespace_packages=[
@@ -53,7 +58,7 @@ setup(
         'azure.cli.command_modules.ml'
     ],
     package_data={
-        '': ['data/*.json', 'data/preamble', 'data/sample.*', 'data/example_app.py', 'data/getsample.py', 'service/*', 'service/data/*']
+        '': ['data/*', 'service/data/*', 'service/*']
     },
     install_requires=DEPENDENCIES,
 )

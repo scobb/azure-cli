@@ -24,11 +24,19 @@ from ._az_util import az_create_storage_and_acr
 from ._az_util import az_create_app_insights_account
 from ._az_util import az_create_acs
 from ._az_util import query_deployment_status
+from ._az_util import az_get_k8s_credentials
+from ._k8s_util import KubernetesOperations
+from ._k8s_util import setup_k8s
+from ..ml import __version__
+
+
+def version():
+    print('Azure Machine Learning Command Line Tools {}'.format(__version__))
 
 
 def acs_marathon_setup(context):
     """Helps set up port forwarding to an ACS cluster."""
-
+    # TODO - use paramiko here to set up tunneling?
     if context.os_is_linux():
         print('Establishing connection to ACS cluster.')
         acs_url = context.get_input(
@@ -179,8 +187,8 @@ def env_about():
                             for details.
     AML_ACR_USER          : Set this to the username of the above ACR.
     AML_ACR_PW            : Set this to the password of the above ACR.
-    AML_APP_INSIGHTS_NAME : Set this to an App Insights account
-    AML_APP_INSIGHTS_KEY  : Set this to an App Insights instrumentation key
+    AML_APP_INSIGHTS_NAME : Set this to an App Insights account.
+    AML_APP_INSIGHTS_KEY  : Set this to an App Insights instrumentation key.
 
 
     Cluster mode:
@@ -191,11 +199,12 @@ def env_about():
     order to use the CLI in cluster mode, define the following environment variables (in addition to those above for
     local mode):
 
-    AML_ACS_MASTER        : Set this to the URL of your ACS Master (e.g.yourclustermgmt.westus.cloudapp.azure.com)
-    AML_ACS_AGENT         : Set this to the URL of your ACS Public Agent (e.g. yourclusteragents.westus.cloudapp.azure.com)
+    AML_ACS_MASTER        : Set this to the URL of your ACS Master (e.g.yourclustermgmt.westus.cloudapp.azure.com).
+    AML_ACS_AGENT         : Set this to the URL of your ACS Public Agent (e.g. yourclusteragents.westus.cloudapp.azure.com).
     AML_HDI_CLUSTER       : Set this to the URL of your HDInsight Spark cluster.
     AML_HDI_USER          : Set this to the admin user of your HDInsight Spark cluster.
     AML_HDI_PW            : Set this to the password of the admin user of your HDInsight Spark cluster.
+    AML_ACS_IS_K8S        ; Set this to 'true' if the ACS cluster is running Kubernetes
     """)
 
 
@@ -207,29 +216,6 @@ def env_cluster(force_connection, forwarded_port, verb, context=CommandLineInter
         print('Please use -f and -p exclusively.')
         return
 
-    # if -f was specified, try direct connection only
-    if force_connection:
-        (acs_is_setup, port) = validate_acs_marathon(context, 0)
-    # if only -p specified, without a port number, set up a new tunnel.
-    elif not forwarded_port:
-        (acs_is_setup, port) = acs_marathon_setup(context)
-    # if either no arguments specified (forwarded_port == -1), or -p NNNNN specified (forwarded_port == NNNNN),
-    # test for an existing connection (-1), or the specified port (NNNNN)
-    elif forwarded_port:
-        (acs_is_setup, port) = validate_acs_marathon(context, forwarded_port)
-    # This should never happen
-    else:
-        (acs_is_setup, port) = (False, -1)
-
-    if not acs_is_setup:
-        continue_without_acs = context.get_input(
-            'Could not connect to ACS cluster. Continue with cluster mode anyway (y/N)? ')
-        continue_without_acs = continue_without_acs.strip().lower()
-        if continue_without_acs != 'y' and continue_without_acs != 'yes':
-            print(
-                "Aborting switch to cluster mode. Please run 'az ml env about' for more information on setting up your cluster.")  # pylint: disable=line-too-long
-            return
-
     try:
         conf = context.read_config()
         if not conf:
@@ -240,8 +226,42 @@ def env_cluster(force_connection, forwarded_port, verb, context=CommandLineInter
             print('[Debug] Resetting.')
         conf = {}
 
+    if not context.env_is_k8s:
+        # if -f was specified, try direct connection only
+        if force_connection:
+            (acs_is_setup, port) = validate_acs_marathon(context, 0)
+        # if only -p specified, without a port number, set up a new tunnel.
+        elif not forwarded_port:
+            (acs_is_setup, port) = acs_marathon_setup(context)
+        # if either no arguments specified (forwarded_port == -1), or -p NNNNN specified (forwarded_port == NNNNN),
+        # test for an existing connection (-1), or the specified port (NNNNN)
+        elif forwarded_port:
+            (acs_is_setup, port) = validate_acs_marathon(context, forwarded_port)
+        # This should never happen
+        else:
+            (acs_is_setup, port) = (False, -1)
+
+        if not acs_is_setup:
+            continue_without_acs = context.get_input(
+                'Could not connect to ACS cluster. Continue with cluster mode anyway (y/N)? ')
+            continue_without_acs = continue_without_acs.strip().lower()
+            if continue_without_acs != 'y' and continue_without_acs != 'yes':
+                print(
+                    "Aborting switch to cluster mode. Please run 'az ml env about' for more information on setting up your cluster.")  # pylint: disable=line-too-long
+                return
+
+        conf['port'] = port
+    else:
+        basename = context.az_account_name[:-4]
+        ssh_key_path = os.path.join(os.path.expanduser('~'), '.ssh', 'acs_id_rsa')
+        if not os.path.exists(ssh_key_path):
+            print('Unable to find ssh key {}. If you did not provision this Kubernetes '
+                  'environment from this machine, you may need to copy the key from '
+                  'the provisioning machine.'.format(ssh_key_path))
+            return
+        az_get_k8s_credentials('{}rg'.format(basename), '{}-cluster'.format(basename), ssh_key_path)
+
     conf['mode'] = 'cluster'
-    conf['port'] = port
     context.write_config(conf)
 
     print("Running in cluster mode.")
@@ -268,13 +288,16 @@ def env_describe(context=CommandLineInterfaceContext()):
         print('HDI cluster URL        : {}'.format(context.hdi_home))
         print('HDI admin user name    : {}'.format(context.hdi_user))
         print('HDI admin password     : {}'.format(context.hdi_pw))
-        print('ACS Master URL         : {}'.format(context.acs_master_url))
-        print('ACS Agent URL          : {}'.format(context.acs_agent_url))
-        forwarded_port = check_marathon_port_forwarding(context)
-        if forwarded_port > 0:
-            print('ACS Port forwarding    : ON, port {}'.format(forwarded_port))
+        if context.env_is_k8s:
+            print('Using Kubernetes       : {}'.format(os.environ.get('AML_ACS_IS_K8S')))
         else:
-            print('ACS Port forwarding    : OFF')
+            print('ACS Master URL         : {}'.format(context.acs_master_url))
+            print('ACS Agent URL          : {}'.format(context.acs_agent_url))
+            forwarded_port = check_marathon_port_forwarding(context)
+            if forwarded_port > 0:
+                print('ACS Port forwarding    : ON, port {}'.format(forwarded_port))
+            else:
+                print('ACS Port forwarding    : OFF')
 
 
 def env_local(verb, context=CommandLineInterfaceContext()):
@@ -317,7 +340,7 @@ def write_acs_to_amlenvrc(acs_master, acs_agent, env_verb):
     print('')
 
 
-def env_setup(status, name, context=CommandLineInterfaceContext()):
+def env_setup(status, name, kubernetes, context=CommandLineInterfaceContext()):
     if status:
         try:
             completed_deployment = az_check_template_deployment_status(status)
@@ -340,6 +363,18 @@ def env_setup(status, name, context=CommandLineInterfaceContext()):
                     else:
                         write_acs_to_amlenvrc(acs_master, acs_agent, "set")
 
+                    try:
+                        with open(os.path.join(os.path.expanduser('~'), '.ssh', 'config'), 'a+') as sshconf:
+                            sshconf.write('Host {}\n'.format(acs_master))
+                            sshconf.write('    HostName {}\n'.format(acs_master))
+                            sshconf.write('    User acsadmin\n')
+                            sshconf.write('    IdentityFile ~/.ssh/acs_id_rsa\n')
+                    except:
+                        print('Failed to update ~/.ssh/config. '
+                              'You will need to manually update your '
+                              '.ssh/config to look for ~/.ssh/acs_id_rsa '
+                              'for host {}'.format(acs_master))
+
                     print("To switch to cluster mode, run 'az ml env cluster'.")
             except AzureCliError as exc:
                 print(exc.message)
@@ -347,7 +382,7 @@ def env_setup(status, name, context=CommandLineInterfaceContext()):
         return
 
     try:
-        ssh_public_key = create_ssh_key_if_not_exists()
+        ssh_private_key_path, ssh_public_key = create_ssh_key_if_not_exists()
     except AzureCliError:
         return
 
@@ -388,17 +423,24 @@ def env_setup(status, name, context=CommandLineInterfaceContext()):
         ('Storage Key', context.az_account_key)]
     ), az_create_storage_and_acr, [root_name, resource_group])
 
-    create_action_with_prompt_if_defined(context, 'ACS', OrderedDict([
-        ('ACS Master URL', context.acs_master_url),
-        ('ACS Agent URL', context.acs_agent_url)]
-    ), az_create_acs, [root_name, resource_group, acr_login_server,
-                       context.acr_username, acr_password, ssh_public_key])
-
     env_verb = 'export' if context.os_is_linux() else 'set'
     env_statements = []
+    if kubernetes:
+        k8s_configured = create_action_with_prompt_if_defined(context, 'Kubernetes Cluster', OrderedDict([
+            ('Kubernetes Cluster Name', KubernetesOperations.get_cluster_name(context))
+        ]), setup_k8s, [context, root_name, resource_group, acr_login_server,
+                        acr_password, ssh_public_key, ssh_private_key_path])
+        if k8s_configured is True:
+            env_statements.append('{} AML_ACS_IS_K8S=True'.format(env_verb))
+    else:
+        create_action_with_prompt_if_defined(context, 'ACS', OrderedDict([
+            ('ACS Master URL', context.acs_master_url),
+            ('ACS Agent URL', context.acs_agent_url)]
+        ), az_create_acs, [root_name, resource_group, acr_login_server,
+                           context.acr_username, acr_password, ssh_public_key])
 
     if isinstance(app_insights_deployment_id, types.GeneratorType):
-        env_statements = ["{} AML_APP_INSIGHTS_NAME={}".format(env_verb, app_insights_deployment_id.next()),
+        env_statements += ["{} AML_APP_INSIGHTS_NAME={}".format(env_verb, app_insights_deployment_id.next()),
                           "{} AML_APP_INSIGHTS_KEY={}".format(env_verb, app_insights_deployment_id.next())]
 
     else:
@@ -413,17 +455,17 @@ def env_setup(status, name, context=CommandLineInterfaceContext()):
                 break
         if completed_deployment:
             app_insights_account_name, app_insights_account_key = az_get_app_insights_account(completed_deployment)
-            env_statements = ["{} AML_APP_INSIGHTS_NAME={}".format(env_verb, app_insights_account_name),
+            env_statements += ["{} AML_APP_INSIGHTS_NAME={}".format(env_verb, app_insights_account_name),
                       "{} AML_APP_INSIGHTS_KEY={}".format(env_verb, app_insights_account_key)]
 
 
     print('To configure az ml for local use with this environment, set the following environment variables.')
 
-    env_statements += ["{} AML_STORAGE_ACCT_NAME='{}'".format(env_verb, storage_account_name),
-                       "{} AML_STORAGE_ACCT_KEY='{}'".format(env_verb, storage_account_key),
-                       "{} AML_ACR_HOME='{}'".format(env_verb, acr_login_server),
-                       "{} AML_ACR_USER='{}'".format(env_verb, context.acr_username),
-                       "{} AML_ACR_PW='{}'".format(env_verb, acr_password)]
+    env_statements += ["{} AML_STORAGE_ACCT_NAME={}".format(env_verb, storage_account_name),
+                       "{} AML_STORAGE_ACCT_KEY={}".format(env_verb, storage_account_key),
+                       "{} AML_ACR_HOME={}".format(env_verb, acr_login_server),
+                       "{} AML_ACR_USER={}".format(env_verb, context.acr_username),
+                       "{} AML_ACR_PW={}".format(env_verb, acr_password)]
     print('\n'.join([' {}'.format(statement) for statement in env_statements]))
 
     try:
@@ -446,7 +488,7 @@ def create_action_with_prompt_if_defined(context, action_str, env_dict, action, 
         print('Found existing {} set up.'.format(action_str))
         for key in env_dict:
             print('{0:30}: {1}'.format(key, env_dict[key]))
-        answer = context.get_input('Setup a new {} instead (y/N)?'.format(action_str))
+        answer = context.get_input('Set up a new {} instead (y/N)?'.format(action_str))
         if answer != 'y' and answer != 'yes':
             print('Continuing with configured {}.'.format(action_str))
             return (env_dict[key] for key in env_dict)

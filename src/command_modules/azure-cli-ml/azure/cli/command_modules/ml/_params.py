@@ -55,6 +55,8 @@ register_cli_argument('ml service create realtime', 'logging_level', options_lis
                       nargs='?', help='Logging level. Valid levels are {}'.format('|'.join(RealtimeConstants.supported_logging_levels)), required=False)
 register_cli_argument('ml service run realtime', 'input_data', options_list=('-d',), default='',
                       help='The data to use for calling the web service.', required=False)
+register_cli_argument('ml service create realtime', 'num_replicas', options_list=('-z',),
+                      default=1, required=False, help='Number of replicas for a Kubernetes service.')
 
 # env workflows
 register_cli_argument('ml env cluster', 'force_connection', options_list=('-f',), action='store_true',
@@ -66,4 +68,4 @@ register_cli_argument('ml env cluster', 'forwarded_port', options_list=('-p',), 
                       )
 register_cli_argument('ml env setup', 'status', options_list=('-s', '--status'), metavar='deploymentId', help='Check the status of an ongoing deployment.', required=False)
 register_cli_argument('ml env setup', 'name', options_list=('-n', '--name'), metavar='envName', help='The name of your Azure ML environment (1-20 characters, alphanumeric only).', required=False)
-
+register_cli_argument('ml env setup', 'kubernetes', options_list=('-k', '--kubernetes'), action='store_true', help='Sets up a new Kubernetes cluster.', required=False)

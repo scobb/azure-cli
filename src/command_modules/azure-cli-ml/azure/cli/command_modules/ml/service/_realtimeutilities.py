@@ -11,22 +11,22 @@ Utilities to create and manage realtime web services.
 
 from __future__ import print_function
 
-from datetime import datetime, timedelta
 import os
 import tarfile
 import uuid
 import requests
 
-from azure.storage.blob import (BlockBlobService, ContentSettings, BlobPermissions)
 from .._util import InvalidConfError
 from .._util import is_int
+from .._k8s_util import KubernetesOperations
+from kubernetes.client.rest import ApiException
 
 
 class RealtimeConstants(object):
     supported_runtimes = ['spark-py', 'cntk-py', 'tensorflow-py', 'scikit-py']
     ninja_runtimes = ['mrs']
-    supported_logging_levels = ['none', 'info', 'debug', 'warn', 'trace']
-    create_cmd_sample = "az ml service create realtime -f <webservice file> -n <service name> [-m <model1> [-m <model2>] ...] [-p requirements.txt] [-s <schema>] [-r {0}] [-l {1}]".format("|".join(supported_runtimes), "|".join(supported_logging_levels))  # pylint: disable=line-too-long
+    supported_logging_levels = ['info', 'debug', 'warn', 'trace']
+    create_cmd_sample = "aml service create realtime -f <webservice file> -n <service name> [-m <model1> [-m <model2>] ...] [-p requirements.txt] [-s <schema>] [-r {0}] [-l {1} [-z <replicas>]".format("|".join(supported_runtimes), "|".join(supported_logging_levels))  # pylint: disable=line-too-long
 
 
 def upload_dependency(context, dependency, verbose):
@@ -168,3 +168,29 @@ def get_sample_data(sample_url, headers, verbose):
         return default_retval
 
     return str(sample_data)
+
+
+def get_k8s_frontend_url():
+    frontend_service_name = 'azureml-fe'
+    k8s_ops = KubernetesOperations()
+    try:
+        frontend_service = k8s_ops.get_service(frontend_service_name)
+        if frontend_service.status.load_balancer.ingress is None:
+            raise ApiException(status=404, reason="LoadBalancer has not finished being created for the Kubernetes Front-end. Please try again in a few minutes.")
+    except ApiException as exc:
+        print("Unable to load details for AzureML Kubernetes Front-End server. {}".format(exc))
+        raise
+
+    base_url = frontend_service.status.load_balancer.ingress[0].ip
+    port = frontend_service.spec.ports[0].port
+    frontend_url = "http://{}:{}/api/v1/service/".format(base_url, port)
+
+    return frontend_url
+
+
+def test_acs_k8s():
+    try:
+        get_k8s_frontend_url()
+        return True
+    except ApiException as exc:
+        return False

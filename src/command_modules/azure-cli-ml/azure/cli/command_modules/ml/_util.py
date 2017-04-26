@@ -15,6 +15,9 @@ import sys
 import platform
 import socket
 from datetime import datetime, timedelta
+from cryptography.hazmat.primitives import serialization as crypto_serialization
+from cryptography.hazmat.primitives.asymmetric import rsa
+from cryptography.hazmat.backends import default_backend as crypto_default_backend
 
 try:
     # python 3
@@ -63,6 +66,7 @@ class CommandLineInterfaceContext(object):
     hdi_home = os.environ.get('AML_HDI_CLUSTER')
     hdi_user = os.environ.get('AML_HDI_USER', '')
     hdi_pw = os.environ.get('AML_HDI_PW', '')
+    env_is_k8s = os.environ.get('AML_ACS_IS_K8S', '')
 
     def __init__(self):
         self.config_path = os.path.join(get_home_dir(), '.amlconf')
@@ -95,7 +99,7 @@ class CommandLineInterfaceContext(object):
                                 stderr=subprocess.PIPE)
         output, err = proc.communicate()
         return self.str_from_subprocess_communicate(output), \
-            self.str_from_subprocess_communicate(err)
+               self.str_from_subprocess_communicate(err)
 
     def read_config(self):
         """
@@ -168,7 +172,8 @@ class CommandLineInterfaceContext(object):
         return 'wasbs://{}@{}.blob.core.windows.net/' \
                '{}'.format(self.az_container_name, self.az_account_name, az_blob_name)
 
-    def upload_dependency_to_azure_blob(self, filepath, container, asset_id, content_type='application/octet-stream'):
+    def upload_dependency_to_azure_blob(self, filepath, container, asset_id,
+                                        content_type='application/octet-stream'):
         """
 
         :param filepath: str path to resource to upload
@@ -181,7 +186,8 @@ class CommandLineInterfaceContext(object):
                                account_key=self.az_account_key)
         bbs.create_container(container)
         bbs.create_blob_from_path(container, asset_id, filepath,
-                                  content_settings=ContentSettings(content_type=content_type))
+                                  content_settings=ContentSettings(
+                                      content_type=content_type))
         blob_sas = bbs.generate_blob_shared_access_signature(
             container_name=container,
             blob_name=asset_id,
@@ -397,7 +403,8 @@ def process_errors(http_response):
     """
     try:
         json_obj = get_json(http_response.content)
-        to_print = '\n'.join([detail['message'] for detail in json_obj['error']['details']])
+        to_print = '\n'.join(
+            [detail['message'] for detail in json_obj['error']['details']])
     except (ValueError, KeyError):
         to_print = http_response.content
 
@@ -494,8 +501,12 @@ def upload_directory(context, filepath, container, verbose):
     for dirpath, _, files in os.walk(filepath):
         for walk_fp in files:
             to_upload = os.path.join(dirpath, walk_fp)
-            container_for_upload = '{}/{}'.format(container, to_upload[len(to_strip) + 1:-(len(walk_fp) + 1)].replace('\\', '/'))
-            _, wasb_path = upload_resource(context, to_upload, container_for_upload, walk_fp,
+            container_for_upload = '{}/{}'.format(container, to_upload[
+                                                             len(to_strip) + 1:-(
+                                                             len(walk_fp) + 1)].replace(
+                '\\', '/'))
+            _, wasb_path = upload_resource(context, to_upload, container_for_upload,
+                                           walk_fp,
                                            verbose)
 
     if wasb_path is None:
@@ -555,6 +566,7 @@ class Response(object):  # pylint: disable=too-few-public-methods
     """
     Interface for use constructing response strings from json object for successful requests
     """
+
     def format_successful_response(self, context, json_obj):
         """
 
@@ -569,6 +581,7 @@ class StaticStringResponse(Response):  # pylint: disable=too-few-public-methods
     """
     Class for use constructing responses that are a static string for successful requests.
     """
+
     def __init__(self, static_string):
         self.static_string = static_string
 
@@ -586,6 +599,7 @@ class TableResponse(Response):
     """
     Class for use constructing response tables from json object for successful requests
     """
+
     def __init__(self, header_to_value_fn_dict):
         """
 
@@ -618,14 +632,17 @@ class TableResponse(Response):
                 rows.append(self.create_row(context, inner_obj, headers))
         else:
             rows.append(self.create_row(context, json_obj, headers))
-        return tabulate(rows, headers=[header.upper() for header in headers], tablefmt='psql')
+        return tabulate(rows, headers=[header.upper() for header in headers],
+                        tablefmt='psql')
 
 
 class MultiTableResponse(TableResponse):
     """
     Class for use building responses with multiple tables
     """
-    def __init__(self, header_to_value_fn_dicts):  # pylint: disable=super-init-not-called
+
+    def __init__(self,
+                 header_to_value_fn_dicts):  # pylint: disable=super-init-not-called
         """
 
         :param header_to_value_fn_dicts:
@@ -637,7 +654,8 @@ class MultiTableResponse(TableResponse):
         result = ''
         for header_to_value_fn_dict in self.header_to_value_fn_dicts:
             self.header_to_value_fn_dict = header_to_value_fn_dict
-            result += super(MultiTableResponse, self).format_successful_response(context, json_obj)
+            result += super(MultiTableResponse, self).format_successful_response(context,
+                                                                                 json_obj)
             result += '\n'
         return result
 
@@ -646,6 +664,7 @@ class StaticStringWithTableReponse(TableResponse):
     """
     Class for use constructing response that is a static string and tables from json object for successful requests
     """
+
     def __init__(self, static_string, header_to_value_fn_dict):
         """
         :param static_string: str that will be printed after table
@@ -656,7 +675,8 @@ class StaticStringWithTableReponse(TableResponse):
         self.static_string = static_string
 
     def format_successful_response(self, context, json_obj):
-        return '\n\n'.join([super(StaticStringWithTableReponse, self).format_successful_response(context, json_obj),
+        return '\n\n'.join([super(StaticStringWithTableReponse,
+                                  self).format_successful_response(context, json_obj),
                             self.static_string])
 
 
@@ -666,6 +686,7 @@ class ValueFunction(object):
          defines set_json, a function for storing the json response we will format
          declares evaluate, a function for retrieving the formatted string
     """
+
     def __init__(self):
         self.json_obj = None
 
@@ -703,6 +724,7 @@ class TraversalFunction(ValueFunction):
 
         NOTE that list traversal is not supported here.
     """
+
     def __init__(self, tup):
         super(TraversalFunction, self).__init__()
         self.traversal_tup = tup
@@ -715,6 +737,7 @@ class ConditionalListTraversalFunction(TraversalFunction):
     """
     Class for use executing actions on members of a list that meet certain criteria
     """
+
     def __init__(self, tup, condition, action):
         super(ConditionalListTraversalFunction, self).__init__(tup)
         self.condition = condition
@@ -722,7 +745,8 @@ class ConditionalListTraversalFunction(TraversalFunction):
 
     def evaluate(self, context):
         json_list = super(ConditionalListTraversalFunction, self).evaluate(context)
-        return ', '.join([self.action(item) for item in json_list if self.condition(item)])
+        return ', '.join(
+            [self.action(item) for item in json_list if self.condition(item)])
 
 
 def is_int(int_str):
@@ -741,20 +765,52 @@ def is_int(int_str):
 
 def create_ssh_key_if_not_exists():
     from ._az_util import AzureCliError
-    if not os.path.exists(os.path.join(os.path.expanduser('~'), '.ssh', 'id_rsa')):
-        try:
-            subprocess.check_call(['ssh-keygen', '-t', 'rsa', '-b', '2048', '-f', os.path.expanduser('~/.ssh/id_rsa')])
-        except subprocess.CalledProcessError:
-            print('Failed to set up sh key pair. Aborting environment setup.')
-            raise AzureCliError('')
+    private_key_path = os.path.join(os.path.expanduser('~'), '.ssh', 'acs_id_rsa')
+    public_key_path = '{}.pub'.format(private_key_path)
+    if not os.path.exists(private_key_path):
+        print('Creating ssh key {}'.format(private_key_path))
+        private_key, public_key = generate_ssh_keys()
+        with open(private_key_path, 'wb') as private_key_file:
+            private_key_file.write(private_key)
+        with open(public_key_path, 'wb') as public_key_file:
+            public_key_file.write(public_key)
+        return private_key_path, public_key
 
     try:
-        with open(os.path.expanduser('~/.ssh/id_rsa.pub'), 'r') as sshkeyfile:
+        with open(public_key_path, 'r') as sshkeyfile:
             ssh_public_key = sshkeyfile.read().rstrip()
     except IOError:
-        print('Could not load your SSH public key from {}'.format(
-            os.path.expanduser('~/.ssh/id_rsa.pub')))
-        print('Please run az ml env setup again to create a new ssh keypair.')
-        raise AzureCliError('')
+        try:
+            with open(private_key_path, 'rb') as private_key_file:
+                key = crypto_serialization.load_pem_private_key(
+                    private_key_file.read(),
+                    password=None,
+                    backend=crypto_default_backend())
+            ssh_public_key = key.public_key().public_bytes(
+                crypto_serialization.Encoding.OpenSSH,
+                crypto_serialization.PublicFormat.OpenSSH
+            )
 
-    return ssh_public_key
+        except IOError:
+            print('Could not load your SSH public key from {}'.format(public_key_path))
+            print('Please run az ml env setup again to create a new ssh keypair.')
+            raise AzureCliError('')
+
+    return private_key_path, ssh_public_key
+
+
+def generate_ssh_keys():
+    key = rsa.generate_private_key(
+        backend=crypto_default_backend(),
+        public_exponent=65537,
+        key_size=2048
+    )
+    private_key = key.private_bytes(
+        crypto_serialization.Encoding.PEM,
+        crypto_serialization.PrivateFormat.TraditionalOpenSSL,
+        crypto_serialization.NoEncryption())
+    public_key = key.public_key().public_bytes(
+        crypto_serialization.Encoding.OpenSSH,
+        crypto_serialization.PublicFormat.OpenSSH
+    )
+    return private_key, public_key
