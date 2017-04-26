@@ -249,12 +249,27 @@ def realtime_service_run_local(service_name, input_data, verbose):
 
 
 # TODO - not yet used
-def realtime_service_scale(context, args):
+def realtime_service_scale(service_name, num_replicas, context=cli_context):
     """Scale a published realtime web service."""
 
     if context.in_local_mode():
         print("Error: Scaling is not supported in local mode.")
         print("To scale a cluster based service, switch to cluster mode first: az ml env cluster")
+        return
+
+    elif context.env_is_k8s:
+        try:
+            num_replicas = int(num_replicas)
+        except ValueError:
+            print("The -z option must be a non-negative integer.")
+            return
+
+        ops = KubernetesOperations()
+        ops.scale_deployment(service_name, num_replicas)
+        return
+
+    else:
+        print("Scaling is not currently supported for Mesos clusters.")
         return
 
     service_name = ''
