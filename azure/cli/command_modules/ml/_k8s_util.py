@@ -299,6 +299,16 @@ class KubernetesOperations:
             print("Unable to delete replica set for deployment {}. {} {}".format(deployment_name, exc, exc.output))
             raise
 
+    def scale_deployment(self, service_name, num_replicas):
+        try:
+            print("Scaling web service {} to {} pods".format(service_name, num_replicas))
+            deployment_name = service_name + '-deployment'
+            num_replicas = int(num_replicas)
+            subprocess.check_call(['kubectl', 'scale', 'deployment', deployment_name,
+                                   '--replicas={}'.format(num_replicas)])
+        except subprocess.CalledProcessError:
+            print("Unable to scale service. {}")
+
     def create_service(self, service_yaml, webservicename, webservice_type):
         try:
             k8s_core = client.CoreV1Api()

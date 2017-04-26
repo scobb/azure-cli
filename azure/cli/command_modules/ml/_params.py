@@ -57,6 +57,8 @@ register_cli_argument('ml service run realtime', 'input_data', options_list=('-d
                       help='The data to use for calling the web service.', required=False)
 register_cli_argument('ml service create realtime', 'num_replicas', options_list=('-z',),
                       default=1, required=False, help='Number of replicas for a Kubernetes service.')
+register_cli_argument('ml service scale realtime', 'num_replicas', options_list=('-z',),
+                      default=1, required=True, help='Number of replicas for a Kubernetes service.')
 
 # env workflows
 register_cli_argument('ml env cluster', 'force_connection', options_list=('-f',), action='store_true',
