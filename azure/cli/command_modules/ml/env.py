@@ -7,6 +7,7 @@ import time
 import types
 from collections import OrderedDict
 from builtins import input
+from builtins import next
 from ._util import CommandLineInterfaceContext
 from ._util import acs_connection_timeout
 from ._util import create_ssh_key_if_not_exists
@@ -440,8 +441,8 @@ def env_setup(status, name, kubernetes, context=CommandLineInterfaceContext()):
                            context.acr_username, acr_password, ssh_public_key])
 
     if isinstance(app_insights_deployment_id, types.GeneratorType):
-        env_statements += ["{} AML_APP_INSIGHTS_NAME={}".format(env_verb, app_insights_deployment_id.next()),
-                          "{} AML_APP_INSIGHTS_KEY={}".format(env_verb, app_insights_deployment_id.next())]
+        env_statements += ["{} AML_APP_INSIGHTS_NAME={}".format(env_verb, next(app_insights_deployment_id)),
+                          "{} AML_APP_INSIGHTS_KEY={}".format(env_verb, next(app_insights_deployment_id))]
 
     else:
         completed_deployment = None
