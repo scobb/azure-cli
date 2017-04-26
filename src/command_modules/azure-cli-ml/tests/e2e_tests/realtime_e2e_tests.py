@@ -36,40 +36,30 @@ class RealtimeE2eTests(unittest.TestCase):
     mesos_context.acs_agent_url = 'stcobmesosacsagent.eastus.cloudapp.azure.com'
 
     @staticmethod
-    def setup_tunnel():
+    def set_up_tunnel():
         from forward import forward_tunnel
         import socket
         import paramiko
-        import os
+        import threading
 
         # Command for paramiko-1.7.7.1
         # Find a random unbound port
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.bind(('', 0))
         local_port = sock.getsockname()[1]
-
-        client = paramiko.SSHClient()
-        acs_id_rsa = os.path.join(os.path.expanduser('~'), '.ssh', 'acs_id_rsa_stcob_lnx2')
-        client.load_system_host_keys(acs_id_rsa)
-        client.set_missing_host_key_policy(paramiko.WarningPolicy())
-        try:
-
-            client.connect(RealtimeE2eTests.mesos_context.acs_master_url,
-                           port=2200,
-                           username='acsadmin',
-                           key_filename=acs_id_rsa)
-
-        except Exception as e:
-
-            print('*** Failed to connect to %s:%d: %r' % (RealtimeE2eTests.mesos_context.acs_master_url, 2200, e))
-            return
-
-        reverse_forward_tun
-        transport = paramiko.Transport(sock)
+        remote_host = RealtimeE2eTests.mesos_context.acs_master_url
+        remote_port = 2200
+        transport = paramiko.Transport((remote_host, remote_port))
         transport.connect(username='acsadmin')
-
-        print('Forwarding local port {} to port 80 on your ACS cluster'.format(local_port))
-        forward_tunnel(local_port, RealtimeE2eTests.mesos_context.acs_master_url, 2200, transport)
+        try:
+            print(
+            'Forwarding local port {} to port 80 on your ACS cluster'.format(local_port))
+            forwarding_thread = threading.Thread(target=forward_tunnel,
+                                                 args=(local_port, remote_host, remote_port, transport))
+            forwarding_thread.start()
+            return forwarding_thread, local_port
+        except Exception as exc:
+            print 'Port forwarding failed: {}'.format(exc)
 
 
     def test_list_local(self):
@@ -83,13 +73,19 @@ class RealtimeE2eTests(unittest.TestCase):
         self.assertTrue(output.endswith('-----+'))
 
     def test_list_mesos(self):
-        self.setup_tunnel()
-        realtime_service_list(context=self.mesos_context)
+        thread = None
+        try:
+            thread, self.mesos_context.forwarded_port = self.set_up_tunnel()
+            realtime_service_list(context=self.mesos_context)
 
-        if not hasattr(sys.stdout, "getvalue"):
-            self.fail("need to run in buffered mode")
-        output = sys.stdout.getvalue().strip()
-        self.assertEqual(output, '')
+            if not hasattr(sys.stdout, "getvalue"):
+                self.fail("need to run in buffered mode")
+            output = sys.stdout.getvalue().strip()
+            self.assertEqual(output, '')
+        finally:
+            if thread:
+                thread.terminate()
+                thread.join()
 
     def test_list_kubernetes(self):
         realtime_service_list(context=self.kube_context)
@@ -116,6 +112,7 @@ def reverse_forward_tunnel(server_port, remote_host, remote_port, transport):
 
 def handler(chan, host, port):
     import socket
+    import select
     sock = socket.socket()
 
     try:
@@ -129,33 +126,27 @@ def handler(chan, host, port):
 
     while True:
 
-    r, w, x = select.select([sock, chan], [], [])
+        r, w, x = select.select([sock, chan], [], [])
 
-    if sock in r:
+        if sock in r:
+            data = sock.recv(1024)
+            if len(data) == 0:
+                break
+            chan.send(data)
+            if chan in r:
+                data = chan.recv(1024)
 
-    data = sock.recv(1024)
+                if len(data) == 0:
 
-    if len(data) == 0:
+                    break
 
-    break
+                sock.send(data)
 
-    chan.send(data)
+                chan.close()
 
-    if chan in r:
+        sock.close()
 
-    data = chan.recv(1024)
-
-    if len(data) == 0:
-
-    break
-
-    sock.send(data)
-
-    chan.close()
-
-    sock.close()
-
-    verbose('Tunnel closed from %r' % (chan.origin_addr,))
+    print('Tunnel closed from %r' % (chan.origin_addr,))
 if __name__ == '__main__':
     assert not hasattr(sys.stdout, "getvalue")
     unittest.main(module=__name__, buffer=True, exit=False)
