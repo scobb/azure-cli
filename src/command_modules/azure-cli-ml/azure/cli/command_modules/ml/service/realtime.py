@@ -552,7 +552,7 @@ def realtime_service_create(score_file, dependencies, requirements, schema_file,
             else:
                 json_payload['properties']['deploymentPackage']['pipRequirements'] = location
 
-    dependency_injection_code = '\nimport tarfile\n'
+    dependency_injection_code = '\nimport tarfile\nimport os.path\n'
     dependency_count = 0
     if dependencies is not None:
         print('Uploading dependencies.')
@@ -575,10 +575,11 @@ def realtime_service_create(score_file, dependencies, requirements, schema_file,
                 # If the asset was a directory, also add code to unzip and layout directory
                 if status == 1:
                     dependency_injection_code = dependency_injection_code + \
-                                                'amlbdws_dependency_{} = tarfile.open("{}")\n'\
+                                                'if os.path.exists("{}"):\n'.format(filename) + \
+                                                '  amlbdws_dependency_{} = tarfile.open("{}")\n'\
                                                 .format(dependency_count, filename)
                     dependency_injection_code = dependency_injection_code + \
-                                                'amlbdws_dependency_{}.extractall()\n'.format(dependency_count)
+                                                '  amlbdws_dependency_{}.extractall()\n'.format(dependency_count)
 
     if verbose:
         print("Code injected to unzip directories:\n{}".format(dependency_injection_code))
