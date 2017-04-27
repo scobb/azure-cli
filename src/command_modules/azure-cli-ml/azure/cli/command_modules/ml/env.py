@@ -366,15 +366,12 @@ def env_setup(status, name, kubernetes, context=CommandLineInterfaceContext()):
 
                     try:
                         ssh_config_fp = os.path.join(os.path.expanduser('~'), '.ssh', 'config')
-                        ssh_config_created = os.path.exists(ssh_config_fp)
                         with open(ssh_config_fp, 'a+') as sshconf:
                             sshconf.write('Host {}\n'.format(acs_master))
                             sshconf.write('    HostName {}\n'.format(acs_master))
                             sshconf.write('    User acsadmin\n')
                             sshconf.write('    IdentityFile ~/.ssh/acs_id_rsa\n')
-
-                        if not ssh_config_created:
-                            os.chmod(ssh_config_fp, 0o600)
+                        os.chmod(ssh_config_fp, 0o600)
                     except:
                         print('Failed to update ~/.ssh/config. '
                               'You will need to manually update your '
