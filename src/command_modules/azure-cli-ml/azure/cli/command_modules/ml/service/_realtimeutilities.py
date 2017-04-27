@@ -21,7 +21,12 @@ from .._util import InvalidConfError
 from .._util import is_int
 from .._k8s_util import KubernetesOperations
 from kubernetes.client.rest import ApiException
-
+try:
+    # python 3
+    from urllib.parse import urlparse
+except ImportError:
+    # python 2
+    from urlparse import urlparse
 
 class RealtimeConstants(object):
     supported_runtimes = ['spark-py', 'cntk-py', 'tensorflow-py', 'scikit-py']
@@ -40,6 +45,8 @@ def upload_dependency(context, dependency, verbose):
        1, 'blob': Success, dependency was a directory, uploaded to blob.
     """
 
+    if dependency.startswith('http') or dependency.startswith('wasb'):
+        return 0, dependency, urlparse(dependency).path.split('/')[-1]
     if not os.path.exists(dependency):
         if verbose:
             print('Error: no such path {}'.format(dependency))
