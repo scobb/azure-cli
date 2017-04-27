@@ -520,6 +520,10 @@ def realtime_service_create(score_file, dependencies, requirements, schema_file,
     # update target runtime in payload
     json_payload['properties']['deploymentPackage']['targetRuntime'] = target_runtime
 
+    # upload target storage for resources
+    json_payload['properties']['storageAccount']['name'] = context.az_account_name
+    json_payload['properties']['storageAccount']['key'] = context.az_account_key
+
     # Add dependencies
 
     # If there's a model specified, add it as a dependency
