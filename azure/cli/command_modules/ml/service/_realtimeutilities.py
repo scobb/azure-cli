@@ -28,6 +28,7 @@ except ImportError:
     # python 2
     from urlparse import urlparse
 
+
 class RealtimeConstants(object):
     supported_runtimes = ['spark-py', 'cntk-py', 'tensorflow-py', 'scikit-py']
     ninja_runtimes = ['mrs']
@@ -36,15 +37,17 @@ class RealtimeConstants(object):
 
 
 def upload_dependency(context, dependency, verbose):
-    """Uploads the named dependency as an asset to the provided azure storage account.
-       If the dependency is a directory, it is zipped up before upload.
-
-       Return values:
-       -1,'': Error - path does not exist
-       0, 'blob': Success, dependency uploaded to blob.
-       1, 'blob': Success, dependency was a directory, uploaded to blob.
     """
 
+    :param context: CommandLineInterfaceContext object
+    :param dependency: path (local, http[s], or wasb[s]) to dependency
+    :param verbose: bool indicating verbosity
+    :return: (int, str, str): statuscode, uploaded_location, dependency_name
+    status codes:
+       -1: Error - path does not exist
+       0: Success, dependency was already remote or uploaded to blob.
+       1: Success, dependency was a directory, uploaded to blob.
+    """
     if dependency.startswith('http') or dependency.startswith('wasb'):
         return 0, dependency, urlparse(dependency).path.split('/')[-1]
     if not os.path.exists(dependency):
