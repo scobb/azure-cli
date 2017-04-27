@@ -396,7 +396,7 @@ def check_for_kubectl(context):
             subprocess.check_output('kubectl', shell=True)
         return True
     except (subprocess.CalledProcessError, OSError):
-        auto_install = input('Failed to find kubectl on the path. One click install? (Y/n): ').lower().strip()
+        auto_install = input('kubectl is not installed on the path. One click install? (Y/n): ').lower().strip()
         if 'n' not in auto_install and 'no' not in auto_install:
             return az_install_kubectl(context)
         else:
