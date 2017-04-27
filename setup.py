@@ -28,6 +28,7 @@ DEPENDENCIES = [
     'azure-mgmt-storage>=1.0.0rc1',
     'azure-storage>=0.33',
     'future',
+    'kubernetes>=1.0.0',
     'paramiko',
     'pyyaml',
     'scp',
