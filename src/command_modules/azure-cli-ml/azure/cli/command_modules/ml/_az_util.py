@@ -336,7 +336,7 @@ def az_create_app_insights_account(root_name, resource_group):
     return deployment_name
 
 
-def az_check_template_deployment_status(deployment_name):
+def az_check_template_deployment_status(deployment_name, silent=False):
     """
     Check the status of a previously started template deployment.
     :param deployment_name: The name of the deployment.
@@ -351,17 +351,18 @@ def az_check_template_deployment_status(deployment_name):
 
     resource_group = deployment_name.split('deployment')[0]
 
-    return query_deployment_status(resource_group, deployment_name)
+    return query_deployment_status(resource_group, deployment_name, silent=silent)
 
 
-def query_deployment_status(resource_group, deployment_name):
+def query_deployment_status(resource_group, deployment_name, silent=False):
     client = client_factory.get_mgmt_service_client(ResourceManagementClient).deployments
     result = client.get(resource_group, deployment_name)
     if result.properties.provisioning_state == 'Succeeded':
         return result
     elif result.properties.provisioning_state == 'Failed':
         raise AzureCliError('Template deployment failed.')
-    print('Deployment status: {}'.format(result.properties.provisioning_state))
+    if not silent:
+        print('Deployment status: {}'.format(result.properties.provisioning_state))
 
 
 def register_acs_providers():
