@@ -405,7 +405,7 @@ def _validate_service_principal(client, sp_id):
     # discard the result, we're trusting this to throw if it can't find something
     try:
         show_service_principal(client.service_principals, sp_id)
-    except:  # pylint: disable=bare-except
+    except Exception:  # pylint: disable=bare-except
         raise CLIError(
             'Failed to validate service principal, if this persists try deleting $HOME/.azure/acsServicePrincipal.json')
 

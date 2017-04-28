@@ -334,13 +334,15 @@ class KubernetesOperations:
 
 
 def setup_k8s(context, root_name, resource_group, acr_login_server, acr_password, ssh_public_key,
-              ssh_private_key_path):
+              ssh_private_key_path, service_principal, client_secret):
     """
 
     Creates and configures a new Kubernetes Cluster on Azure with:
     1. Our azureml-fe frontend service.
     2. ACR secrets for our system store and the user's ACR.
 
+    :param service_principal: str name of service principal
+    :param client_secret: str client secret for service principal
     :param root_name: The root name for the environment used to construct the cluster name.
     :param resource_group: The resource group to create the cluster in.
     :param acr_login_server: The base url of the user's ACR.
@@ -350,13 +352,14 @@ def setup_k8s(context, root_name, resource_group, acr_login_server, acr_password
 
     :return: None
     """
-    print('Setting up Kubernetes Cluster')
+    print('Setting up Kubernetes Cluster in ACS.')
     cluster_name = root_name + "-cluster"
     try:
         if not check_for_kubectl(context):
             return False
         acr_email = az_get_active_email()
-        az_create_kubernetes(resource_group, cluster_name, root_name, ssh_public_key)
+        az_create_kubernetes(resource_group, cluster_name, root_name, ssh_public_key,
+                             service_principal, client_secret)
         az_get_k8s_credentials(resource_group, cluster_name, ssh_private_key_path)
         k8s_ops = KubernetesOperations()
         k8s_ops.add_acr_secret(context.acr_username + 'acrkey', context.acr_username, acr_login_server,
