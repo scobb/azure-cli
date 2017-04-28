@@ -114,12 +114,12 @@ class CommandLineInterfaceContext(object):
                             'ACS admin username : acsadmin (Needed to set up port forwarding in cluster mode).')
                         print(
                             'To configure az ml with this environment, set the following environment variables.')
-                        print('{} has also been updated.'.format(
-                            os.path.join(os.path.expanduser('~'), '.amlenvrc')))
                         if platform.system() in ['Linux', 'linux', 'Unix', 'unix']:
                             write_acs_to_amlenvrc(acs_master, acs_agent, "export")
                         else:
                             write_acs_to_amlenvrc(acs_master, acs_agent, "set")
+                        print('{} has also been updated.'.format(
+                            os.path.join(os.path.expanduser('~'), '.amlenvrc')))
 
                         try:
                             ssh_config_fp = os.path.join(os.path.expanduser('~'), '.ssh',
