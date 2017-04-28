@@ -341,7 +341,7 @@ def write_acs_to_amlenvrc(acs_master, acs_agent, env_verb):
     print('')
 
 
-def env_setup(status, name, kubernetes, context=CommandLineInterfaceContext()):
+def env_setup(status, name, kubernetes, local_only, context=CommandLineInterfaceContext()):
     if status:
         try:
             completed_deployment = az_check_template_deployment_status(status)
@@ -389,7 +389,12 @@ def env_setup(status, name, kubernetes, context=CommandLineInterfaceContext()):
     except AzureCliError:
         return
 
-    print('Setting up your Azure ML environment with a storage account, App Insights account, ACR registry and ACS cluster.')
+    if local_only:
+        print(
+        'Setting up your Azure ML environment with a storage account, App Insights account, and ACR registry.')
+    else:
+        print('Setting up your Azure ML environment with a storage account, App Insights account, ACR registry and ACS cluster.')
+
     if not name:
         root_name = input('Enter environment name (1-20 characters, lowercase alphanumeric): ')
         try:
@@ -409,38 +414,67 @@ def env_setup(status, name, kubernetes, context=CommandLineInterfaceContext()):
         print(exc.message)
         return
 
+    app_insight_values_to_check = OrderedDict([
+            ('App Insights Account Name', context.app_insights_account_name),
+            ('App Insights Account Key', context.app_insights_account_key)
+        ])
+    app_insight_args = [root_name, resource_group]
     app_insights_deployment_id = create_action_with_prompt_if_defined(
         context,
         'App Insights Account',
-        OrderedDict([
-            ('App Insights Account Name', context.app_insights_account_name),
-            ('App Insights Account Key', context.app_insights_account_key)
-        ]), az_create_app_insights_account, [root_name, resource_group])
+        app_insight_values_to_check,
+        az_create_app_insights_account,
+        app_insight_args
+    )
 
-    (acr_login_server, context.acr_username, acr_password, storage_account_name,
-     storage_account_key) = create_action_with_prompt_if_defined(context, 'ACR and storage', OrderedDict([
+    acr_values_to_check = OrderedDict([
         ('ACR Login Server', context.acr_home),
         ('ACR Username', context.acr_user),
         ('ACR Password', context.acr_pw),
         ('Storage Account', context.az_account_name),
         ('Storage Key', context.az_account_key)]
-    ), az_create_storage_and_acr, [root_name, resource_group])
+    )
+    acr_args = [root_name, resource_group]
+    (acr_login_server, context.acr_username, acr_password, storage_account_name,
+     storage_account_key) = create_action_with_prompt_if_defined(
+        context,
+        'ACR and storage',
+        acr_values_to_check,
+        az_create_storage_and_acr,
+        acr_args
+    )
 
     env_verb = 'export' if context.os_is_linux() else 'set'
     env_statements = []
-    if kubernetes:
-        k8s_configured = create_action_with_prompt_if_defined(context, 'Kubernetes Cluster', OrderedDict([
-            ('Kubernetes Cluster Name', KubernetesOperations.get_cluster_name(context))
-        ]), setup_k8s, [context, root_name, resource_group, acr_login_server,
-                        acr_password, ssh_public_key, ssh_private_key_path])
-        if k8s_configured is True:
-            env_statements.append('{} AML_ACS_IS_K8S=True'.format(env_verb))
-    else:
-        create_action_with_prompt_if_defined(context, 'ACS', OrderedDict([
-            ('ACS Master URL', context.acs_master_url),
-            ('ACS Agent URL', context.acs_agent_url)]
-        ), az_create_acs, [root_name, resource_group, acr_login_server,
-                           context.acr_username, acr_password, ssh_public_key])
+    if not local_only:
+        if kubernetes:
+            k8s_values_to_check = OrderedDict([
+                    ('Kubernetes Cluster Name', KubernetesOperations.get_cluster_name(context))
+                ])
+            k8s_args = [context, root_name, resource_group, acr_login_server,
+                        acr_password, ssh_public_key, ssh_private_key_path]
+            k8s_configured = create_action_with_prompt_if_defined(
+                context,
+                'Kubernetes Cluster',
+                k8s_values_to_check,
+                setup_k8s,
+                k8s_args)
+            if k8s_configured is True:
+                env_statements.append('{} AML_ACS_IS_K8S=True'.format(env_verb))
+        else:
+            mesos_values_to_check = OrderedDict([
+                ('ACS Master URL', context.acs_master_url),
+                ('ACS Agent URL', context.acs_agent_url)]
+            )
+            mesos_args = [root_name, resource_group, acr_login_server,
+                          context.acr_username, acr_password, ssh_public_key]
+            create_action_with_prompt_if_defined(
+                context,
+                'ACS',
+                mesos_values_to_check,
+                az_create_acs,
+                mesos_args
+            )
 
     if isinstance(app_insights_deployment_id, types.GeneratorType):
         env_statements += ["{} AML_APP_INSIGHTS_NAME={}".format(env_verb, next(app_insights_deployment_id)),
