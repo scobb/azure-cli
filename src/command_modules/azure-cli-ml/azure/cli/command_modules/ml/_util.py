@@ -791,10 +791,10 @@ def create_ssh_key_if_not_exists():
                     private_key_file.read(),
                     password=None,
                     backend=crypto_default_backend())
-            ssh_public_key = key.public_key().public_bytes(
-                crypto_serialization.Encoding.OpenSSH,
-                crypto_serialization.PublicFormat.OpenSSH
-            ).decode('ascii')
+                ssh_public_key = key.public_key().public_bytes(
+                    crypto_serialization.Encoding.OpenSSH,
+                    crypto_serialization.PublicFormat.OpenSSH
+                ).decode('ascii')
 
         except IOError:
             print('Could not load your SSH public key from {}'.format(public_key_path))
