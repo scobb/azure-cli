@@ -345,44 +345,52 @@ def write_acs_to_amlenvrc(acs_master, acs_agent, env_verb):
 def env_setup(status, name, kubernetes, local_only, service_principal_app_id,
               service_principal_password, context=CommandLineInterfaceContext()):
     if status:
-        try:
-            completed_deployment = az_check_template_deployment_status(status)
-        except AzureCliError as exc:
-            print(exc.message)
+        deployments = context.get_deployments()
+        if not deployments:
+            print('No active deployments found.')
+            print('To begin provisioning an environment, run')
+            print('  az ml env setup [-k]')
             return
-
-        if completed_deployment:
+        for deployment_id in deployments:
+            print('Checking on deployment {}...'.format(deployment_id))
             try:
-                acs_master = completed_deployment.properties.outputs['masterFQDN']['value']
-                acs_agent = completed_deployment.properties.outputs['agentpublicFQDN']['value']
-                if acs_master and acs_agent:
-                    print('ACS deployment succeeded.')
-                    print('ACS Master URL     : {}'.format(acs_master))
-                    print('ACS Agent URL      : {}'.format(acs_agent))
-                    print('ACS admin username : acsadmin (Needed to set up port forwarding in cluster mode).')
-                    print('To configure az ml with this environment, set the following environment variables.')
-                    if platform.system() in ['Linux', 'linux', 'Unix', 'unix']:
-                        write_acs_to_amlenvrc(acs_master, acs_agent, "export")
-                    else:
-                        write_acs_to_amlenvrc(acs_master, acs_agent, "set")
-
-                    try:
-                        ssh_config_fp = os.path.join(os.path.expanduser('~'), '.ssh', 'config')
-                        with open(ssh_config_fp, 'a+') as sshconf:
-                            sshconf.write('Host {}\n'.format(acs_master))
-                            sshconf.write('    HostName {}\n'.format(acs_master))
-                            sshconf.write('    User acsadmin\n')
-                            sshconf.write('    IdentityFile ~/.ssh/acs_id_rsa\n')
-                        os.chmod(ssh_config_fp, 0o600)
-                    except:
-                        print('Failed to update ~/.ssh/config. '
-                              'You will need to manually update your '
-                              '.ssh/config to look for ~/.ssh/acs_id_rsa '
-                              'for host {}'.format(acs_master))
-
-                    print("To switch to cluster mode, run 'az ml env cluster'.")
+                completed_deployment = az_check_template_deployment_status(deployment_id)
             except AzureCliError as exc:
                 print(exc.message)
+                return
+
+            if completed_deployment:
+                try:
+                    acs_master = completed_deployment.properties.outputs['masterFQDN']['value']
+                    acs_agent = completed_deployment.properties.outputs['agentpublicFQDN']['value']
+                    if acs_master and acs_agent:
+                        print('ACS deployment succeeded.')
+                        print('ACS Master URL     : {}'.format(acs_master))
+                        print('ACS Agent URL      : {}'.format(acs_agent))
+                        print('ACS admin username : acsadmin (Needed to set up port forwarding in cluster mode).')
+                        print('To configure az ml with this environment, set the following environment variables.')
+                        if platform.system() in ['Linux', 'linux', 'Unix', 'unix']:
+                            write_acs_to_amlenvrc(acs_master, acs_agent, "export")
+                        else:
+                            write_acs_to_amlenvrc(acs_master, acs_agent, "set")
+
+                        try:
+                            ssh_config_fp = os.path.join(os.path.expanduser('~'), '.ssh', 'config')
+                            with open(ssh_config_fp, 'a+') as sshconf:
+                                sshconf.write('Host {}\n'.format(acs_master))
+                                sshconf.write('    HostName {}\n'.format(acs_master))
+                                sshconf.write('    User acsadmin\n')
+                                sshconf.write('    IdentityFile ~/.ssh/acs_id_rsa\n')
+                            os.chmod(ssh_config_fp, 0o600)
+                        except:
+                            print('Failed to update ~/.ssh/config. '
+                                  'You will need to manually update your '
+                                  '.ssh/config to look for ~/.ssh/acs_id_rsa '
+                                  'for host {}'.format(acs_master))
+                        context.remove_deployment(deployment_id)
+                        print("To switch to cluster mode, run 'az ml env cluster'.")
+                except AzureCliError as exc:
+                    print(exc.message)
 
         return
 

@@ -68,7 +68,7 @@ register_cli_argument('ml env cluster', 'forwarded_port', options_list=('-p',), 
                       const=None, default=-1, type=int, required=False,
                       help='Use port forwarding. If a port number is specified, test for an existing tunnel. Without a port number, try to set up an ssh tunnel through an unused port.' #pylint: disable=line-too-long
                       )
-register_cli_argument('ml env setup', 'status', options_list=('-s', '--status'), metavar='deploymentId', help='Check the status of an ongoing deployment.', required=False)
+register_cli_argument('ml env setup', 'status', options_list=('-s', '--status'), help='Check the status of an ongoing deployment.', required=False, action='store_true')
 register_cli_argument('ml env setup', 'name', options_list=('-n', '--name'), metavar='envName', help='The name of your Azure ML environment (1-20 characters, alphanumeric only).', required=False)
 register_cli_argument('ml env setup', 'kubernetes', options_list=('-k', '--kubernetes'), action='store_true', help='Sets up a new Kubernetes cluster.', required=False)
 register_cli_argument('ml env setup', 'local_only', options_list=('-l', '--local-only'), action='store_true', help='Sets up only local mode (no ACS).', required=False)

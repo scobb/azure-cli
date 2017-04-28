@@ -14,6 +14,7 @@ import json
 import sys
 import platform
 import socket
+import errno
 from datetime import datetime, timedelta
 from cryptography.hazmat.primitives import serialization as crypto_serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
@@ -35,6 +36,7 @@ import requests
 from tabulate import tabulate
 from builtins import input
 from azure.storage.blob import (BlobPermissions, BlockBlobService, ContentSettings)
+from azure.cli.core.util import CLIError
 
 ice_base_url = 'https://amlacsagent.azureml-int.net'
 acs_connection_timeout = 5
@@ -67,6 +69,7 @@ class CommandLineInterfaceContext(object):
     hdi_user = os.environ.get('AML_HDI_USER', '')
     hdi_pw = os.environ.get('AML_HDI_PW', '')
     env_is_k8s = os.environ.get('AML_ACS_IS_K8S', '')
+    deployment_fp = os.path.join(os.path.expanduser('~'), '.amldep')
 
     def __init__(self):
         self.config_path = os.path.join(get_home_dir(), '.amlconf')
@@ -76,6 +79,7 @@ class CommandLineInterfaceContext(object):
             if outer_match_obj:
                 self.hdi_home = outer_match_obj.group('cluster_name')
         self.hdi_domain = self.hdi_home.split('.')[0] if self.hdi_home else None
+
 
     @staticmethod
     def str_from_subprocess_communicate(output):
@@ -87,6 +91,49 @@ class CommandLineInterfaceContext(object):
         if isinstance(output, bytes):
             return output.decode('utf-8')
         return output
+
+    def add_deployment(self, deployment_id):
+        """
+
+        :param deployment_id: str deployment id to append to deployment file
+        :return: None
+        """
+        with open(self.deployment_fp, 'a+') as deployment_file:
+            deployment_file.write('{}\n'.format(deployment_id))
+
+    def get_deployments(self):
+        """
+
+        :return: list of  str deployment IDs
+        """
+        try:
+            with open(self.deployment_fp) as deployment_file:
+                return [deployment_id.strip() for deployment_id in deployment_file.readlines()
+                        if deployment_id]
+        except IOError as exc:
+            # create deployment file to avoid exception in future
+            if exc.errno == errno.ENOENT:
+                with open(self.deployment_fp, 'w') as _:
+                    pass
+                return []
+
+            # unexpected error, report
+            raise CLIError('Unexpected error reading deployment file: {}. '
+                           'Please contact deployml@microsoft.com if this error persists.'.format(exc))
+
+    def remove_deployment(self, deployment_id):
+        """
+
+        :param deployment_id: str deployment id  to remove from deployment file
+        :return: None
+        """
+        deployments = self.get_deployments()
+        try:
+            deployments.remove(deployment_id)
+            with open(self.deployment_fp, 'w') as deployment_file:
+                deployment_file.write('\n'.join(deployments))
+        except ValueError:
+            print('Unable to find {} among expected deployments.'.format(deployment_id))
 
     def run_cmd(self, cmd):
         """

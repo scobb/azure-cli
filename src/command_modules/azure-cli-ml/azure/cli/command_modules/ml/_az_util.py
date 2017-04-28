@@ -234,7 +234,7 @@ def az_create_storage_and_acr(root_name, resource_group):
 
 
 def az_create_acs(root_name, resource_group, acr_login_server, acr_username,
-                  acr_password, ssh_public_key):
+                  acr_password, ssh_public_key, context):
     """
     Creates an ACS cluster using the Azure CLI and our ARM template. This function should only
     be called after create_acr above. It assumes that the user is already logged in to Azure, and
@@ -269,12 +269,12 @@ def az_create_acs(root_name, resource_group, acr_login_server, acr_username,
     client = client_factory.get_mgmt_service_client(ResourceManagementClient).deployments
     client.create_or_update(resource_group, deployment_name, properties, raw=True)
 
+    context.add_deployment(deployment_name)
     print(
         'Started ACS deployment. Please note that it can take up to 15 minutes to complete the deployment.')
     print(
         'You can continue to work with az ml in local mode while the ACS is being provisioned.')
-    print("To check the status of the deployment, run 'az ml env setup -s {}'".format(
-        deployment_name))
+    print("To check the status of the deployment, run 'az ml env setup -s'")
 
 
 def az_get_app_insights_account(completed_deployment):
