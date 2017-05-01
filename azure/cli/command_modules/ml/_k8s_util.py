@@ -8,6 +8,7 @@ import json
 import os
 import re
 import subprocess
+from urllib3.exceptions import MaxRetryError
 from builtins import input
 from ._az_util import az_create_kubernetes
 from ._az_util import az_get_k8s_credentials
@@ -341,14 +342,14 @@ def setup_k8s(context, root_name, resource_group, acr_login_server, acr_password
     1. Our azureml-fe frontend service.
     2. ACR secrets for our system store and the user's ACR.
 
-    :param service_principal: str name of service principal
-    :param client_secret: str client secret for service principal
     :param root_name: The root name for the environment used to construct the cluster name.
     :param resource_group: The resource group to create the cluster in.
     :param acr_login_server: The base url of the user's ACR.
     :param acr_password: The password for the user's ACR.
     :param ssh_public_key: Value of ssh public key
     :param ssh_private_key_path: str path to private key
+    :param service_principal: str name of service principal
+    :param client_secret: str client secret for service principal
 
     :return: None
     """
@@ -362,8 +363,22 @@ def setup_k8s(context, root_name, resource_group, acr_login_server, acr_password
                              service_principal, client_secret)
         az_get_k8s_credentials(resource_group, cluster_name, ssh_private_key_path)
         k8s_ops = KubernetesOperations()
-        k8s_ops.add_acr_secret(context.acr_username + 'acrkey', context.acr_username, acr_login_server,
-                               acr_password, acr_email)
+        try:
+            k8s_ops.add_acr_secret(context.acr_username + 'acrkey', context.acr_username, acr_login_server,
+                                   acr_password, acr_email)
+        except MaxRetryError:
+            print('Failed to add secret to your Kubernetes cluster. '
+                  'This can occur if the service principal does not '
+                  'have the correct permissions on your subscription.')
+            if service_principal:
+                print('Please verify that your service principal has '
+                      'Contributor privileges on the subscription you are trying to '
+                      'provision in.')
+            else:
+                print('{} may be corrupted--delete it and try provisioning '
+                      'again.'.format(os.path.join(os.path.expanduser('~'),
+                                                   '.azure', 'acsServicePrincipal.json')))
+            print('If this error persists, please contact deployml@microsoft.com.')
         deploy_frontend(k8s_ops, acr_email)
 
     except InvalidNameError as exc:

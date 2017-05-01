@@ -88,22 +88,11 @@ def validate_env_name(name):
             'Name must only contain lowercase alphanumeric characters.')
 
 
-def az_login(service_principal, client_secret, tenant):
+def az_login():
     """Log in to Azure if not already logged in
-    :param service_principal str sp app ID
-    :param client_secret str sp password
-    :param tenant str tenant id
     :return None
     """
     profile = Profile()
-
-    # log user in as service principal
-    if service_principal and client_secret and tenant:
-        try:
-            az_logout()
-            profile.find_subscriptions_on_login(False, service_principal, client_secret, True, tenant)
-        except adal.adal_error.AdalError as exc:
-            raise CLIError(str(exc))
 
     # interactive login
     try:
@@ -347,7 +336,7 @@ def az_create_app_insights_account(root_name, resource_group):
     return deployment_name
 
 
-def az_check_template_deployment_status(deployment_name, service_principal, client_secret, tenant):
+def az_check_template_deployment_status(deployment_name):
     """
     Check the status of a previously started template deployment.
     :param deployment_name: The name of the deployment.
@@ -355,7 +344,7 @@ def az_check_template_deployment_status(deployment_name, service_principal, clie
     """
 
     # Log in to Azure if not already logged in
-    az_login(service_principal, client_secret, tenant)
+    az_login()
 
     if 'deployment' not in deployment_name:
         raise AzureCliError('Not a valid AML deployment name.')
