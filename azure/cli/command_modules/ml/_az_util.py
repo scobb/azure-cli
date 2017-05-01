@@ -93,7 +93,7 @@ def az_login(service_principal, client_secret, tenant):
     :param service_principal str sp app ID
     :param client_secret str sp password
     :param tenant str tenant id
-    :return bool True if service principal
+    :return None
     """
     profile = Profile()
 
@@ -102,19 +102,16 @@ def az_login(service_principal, client_secret, tenant):
         try:
             az_logout()
             profile.find_subscriptions_on_login(False, service_principal, client_secret, True, tenant)
-            return True
         except adal.adal_error.AdalError as exc:
             raise CLIError(str(exc))
 
     # interactive login
     try:
         profile.get_subscription()
-        return False
     except CLIError as exc:
         # thrown when not logged in
         if "'az login'" in str(exc):
             profile.find_subscriptions_on_login(True, None, None, None, None)
-            return False
         elif "'az account set'" in str(exc):
             # TODO - figure out what to do here..
             raise
@@ -396,12 +393,12 @@ def az_create_kubernetes(resource_group, cluster_name, dns_prefix, ssh_key_value
                          service_principal, client_secret):
     """
     Creates a new Kubernetes cluster through az. This can take up to 10 minutes.
-    :param service_principal: str name of service principal
-    :param client_secret: str client secret for service principal
     :param resource_group: The name of the resource group to add the cluster to.
     :param cluster_name: The name of the cluster being created
     :param dns_prefix: The dns prefix for the cluster.
     :param ssh_key_value: The absolute path to the ssh key used to set up the cluster.
+    :param service_principal: str name of service principal
+    :param client_secret: str client secret for service principal
 
     :return bool: If creation is successful, return true. Otherwise an exception will be raised.
     """
@@ -419,11 +416,8 @@ def az_create_kubernetes(resource_group, cluster_name, dns_prefix, ssh_key_value
     _, subscription_id, _ = Profile().get_login_credentials(subscription_id=None)
     register_acs_providers()
     client = _graph_client_factory()
-    print(service_principal)
-    print(client_secret)
     if not service_principal:
         principalObj = load_acs_service_principal(subscription_id)
-        print('principalObj: {}'.format(principalObj))
         if principalObj:
             service_principal = principalObj.get('service_principal')
             client_secret = principalObj.get('client_secret')
