@@ -135,7 +135,7 @@ def get_local_realtime_service_port(service_name, verbose):
         return -2
 
 
-def realtime_service_deploy_local(context, image, verbose, app_insights_enabled, logging_level):
+def realtime_service_deploy_local(context, image, verbose, app_insights_enabled):
     """Deploy a realtime web service locally as a docker container."""
 
     print("[Local mode] Running docker container.")
@@ -161,7 +161,6 @@ def realtime_service_deploy_local(context, image, verbose, app_insights_enabled,
         docker_output = subprocess.check_output(
             ["docker", "run", "-e", "AML_APP_INSIGHTS_KEY={}".format(context.app_insights_account_key),
                               "-e", "AML_APP_INSIGHTS_ENABLED={}".format(app_insights_enabled),
-                              "-e", "AML_CONSOLE_LOG={}".format(logging_level),
                               "-d", "-P", "-l", "amlid={}".format(service_label), "{}".format(image)]).decode('ascii')
     except subprocess.CalledProcessError:
         print('[Local mode] Error starting docker container. Please ensure you have permissions to run docker.')
@@ -448,14 +447,13 @@ def realtime_service_delete(service_name, verb, context=cli_context):
 
 
 def realtime_service_create(score_file, dependencies, requirements, schema_file, service_name,
-                            verb, custom_ice_url, target_runtime, logging_level, model, num_replicas,
+                            verb, custom_ice_url, target_runtime, app_insights_logging_enabled, model, num_replicas,
                             context=cli_context):
     """Create a new realtime web service."""
 
     verbose = verb
-    if logging_level == 'none':
+    if app_insights_logging_enabled:
         app_insights_enabled = 'false'
-        logging_level = 'debug'
     else:
         app_insights_enabled = 'true'
 
@@ -733,14 +731,14 @@ def realtime_service_create(score_file, dependencies, requirements, schema_file,
     print('done.')
     print('Image available at : {}'.format(acs_payload['container']['docker']['image']))
     if context.in_local_mode():
-        return realtime_service_deploy_local(context, image, verbose, app_insights_enabled, logging_level)
+        return realtime_service_deploy_local(context, image, verbose, app_insights_enabled)
     elif context.env_is_k8s:
-        realtime_service_deploy_k8s(context, image, service_name, app_insights_enabled, logging_level, num_replicas)
+        realtime_service_deploy_k8s(context, image, service_name, app_insights_enabled, num_replicas)
     else:
-        realtime_service_deploy(context, image, service_name, app_insights_enabled, logging_level, verbose)
+        realtime_service_deploy(context, image, service_name, app_insights_enabled, verbose)
 
 
-def realtime_service_deploy(context, image, app_id, app_insights_enabled, logging_level, verbose):
+def realtime_service_deploy(context, image, app_id, app_insights_enabled, verbose):
     """Deploy a realtime web service from a docker image."""
 
     marathon_app = resource_string(__name__, 'data/marathon.json')
@@ -750,7 +748,6 @@ def realtime_service_deploy(context, image, app_id, app_insights_enabled, loggin
     marathon_app['labels']['AMLID'] = app_id
     marathon_app['env']['AML_APP_INSIGHTS_KEY'] = context.app_insights_account_key
     marathon_app['env']['AML_APP_INSIGHTS_ENABLED'] = app_insights_enabled
-    marathon_app['env']['AML_CONSOLE_LOG'] = logging_level
     marathon_app['id'] = app_id
 
     if verbose:
@@ -797,7 +794,7 @@ def realtime_service_deploy(context, image, app_id, app_insights_enabled, loggin
     print("Usage: az ml service run realtime -n " + app_id + " [-d '{\"input\" : \"!! YOUR DATA HERE !!\"}']")
 
 
-def realtime_service_deploy_k8s(context, image, app_id, app_insights_enabled, logging_level, num_replicas):
+def realtime_service_deploy_k8s(context, image, app_id, app_insights_enabled, num_replicas):
     """Deploy a realtime Kubernetes web service from a docker image."""
 
     k8s_template_path = os.path.join(os.path.dirname(os.path.abspath(__file__)),
@@ -822,7 +819,6 @@ def realtime_service_deploy_k8s(context, image, app_id, app_insights_enabled, lo
     kubernetes_app['spec']['template']['metadata']['labels']['type'] = "realtime"
     kubernetes_app['spec']['template']['spec']['containers'][0]['env'][0]['value'] = context.app_insights_account_key
     kubernetes_app['spec']['template']['spec']['containers'][0]['env'][1]['value'] = app_insights_enabled
-    kubernetes_app['spec']['template']['spec']['containers'][0]['env'][2]['value'] = logging_level
     kubernetes_app['spec']['template']['spec']['imagePullSecrets'][0]['name'] = context.acr_user + 'acrkey'
 
     with open(tmp_k8s_path, 'w') as f:
