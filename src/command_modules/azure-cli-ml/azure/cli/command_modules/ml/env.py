@@ -343,10 +343,10 @@ def write_acs_to_amlenvrc(acs_master, acs_agent, env_verb):
 
 
 def env_setup(status, name, kubernetes, local_only, service_principal,
-              client_secret, tenant, context=CommandLineInterfaceContext()):
+              client_secret, context=CommandLineInterfaceContext()):
     if status:
         try:
-            completed_deployment = az_check_template_deployment_status(status, service_principal, client_secret, tenant)
+            completed_deployment = az_check_template_deployment_status(status)
         except AzureCliError as exc:
             print(exc.message)
             return
@@ -409,7 +409,7 @@ def env_setup(status, name, kubernetes, local_only, service_principal,
 
     if service_principal and not client_secret:
         raise AzureCliError('When deploying with service principal, client secret must be specified.')
-    az_login(service_principal, client_secret, tenant)
+    az_login()
     az_check_subscription()
     resource_group = az_create_resource_group(context, root_name)
 

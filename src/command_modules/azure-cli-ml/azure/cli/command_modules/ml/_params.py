@@ -74,4 +74,3 @@ register_cli_argument('ml env setup', 'kubernetes', options_list=('-k', '--kuber
 register_cli_argument('ml env setup', 'local_only', options_list=('-l', '--local-only'), action='store_true', help='Sets up only local mode (no ACS).', required=False)
 register_cli_argument('ml env setup', 'service_principal', options_list=('-p', '--service-principal'), help='Service principal to use for configuring ACS cluster.', required=False)
 register_cli_argument('ml env setup', 'client_secret', options_list=('-c', '--client-secret'), help='Client secret associated with service principal.', required=False)
-register_cli_argument('ml env setup', 'tenant', options_list=('-t', '--tenant'), help='Tenant associated with service principal.', required=False)
