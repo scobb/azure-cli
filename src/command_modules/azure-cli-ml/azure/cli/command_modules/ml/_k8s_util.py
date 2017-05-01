@@ -379,6 +379,7 @@ def setup_k8s(context, root_name, resource_group, acr_login_server, acr_password
                       'again.'.format(os.path.join(os.path.expanduser('~'),
                                                    '.azure', 'acsServicePrincipal.json')))
             print('If this error persists, please contact deployml@microsoft.com.')
+            return False
         deploy_frontend(k8s_ops, acr_email)
 
     except InvalidNameError as exc:
