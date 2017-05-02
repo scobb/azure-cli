@@ -452,10 +452,7 @@ def realtime_service_create(score_file, dependencies, requirements, schema_file,
     """Create a new realtime web service."""
 
     verbose = verb
-    if app_insights_logging_enabled:
-        app_insights_enabled = 'true'
-    else:
-        app_insights_enabled = 'false'
+    app_insights_enabled = str(app_insights_logging_enabled).lower()
 
     is_known_runtime = \
         target_runtime in RealtimeConstants.supported_runtimes or target_runtime in RealtimeConstants.ninja_runtimes
