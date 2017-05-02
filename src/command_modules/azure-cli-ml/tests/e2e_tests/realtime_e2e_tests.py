@@ -1,5 +1,6 @@
 import unittest
 import sys
+import threading
 from mocks import E2eContext
 from azure.cli.command_modules.ml.service.realtime import realtime_service_list
 
@@ -40,7 +41,6 @@ class RealtimeE2eTests(unittest.TestCase):
         from forward import forward_tunnel
         import socket
         import paramiko
-        import threading
 
         # Command for paramiko-1.7.7.1
         # Find a random unbound port
@@ -56,6 +56,7 @@ class RealtimeE2eTests(unittest.TestCase):
             'Forwarding local port {} to port 80 on your ACS cluster'.format(local_port))
             forwarding_thread = threading.Thread(target=forward_tunnel,
                                                  args=(local_port, remote_host, remote_port, transport))
+            forwarding_thread.daemon = True
             forwarding_thread.start()
             return forwarding_thread, local_port
         except Exception as exc:
