@@ -20,6 +20,7 @@ import yaml
 import errno
 import platform
 import stat
+import adal
 from scp import SCPClient
 from pkg_resources import resource_string
 from azure.cli.core._profile import Profile
@@ -88,8 +89,12 @@ def validate_env_name(name):
 
 
 def az_login():
-    """Log in to Azure if not already logged in"""
+    """Log in to Azure if not already logged in
+    :return None
+    """
     profile = Profile()
+
+    # interactive login
     try:
         profile.get_subscription()
     except CLIError as exc:
@@ -101,6 +106,11 @@ def az_login():
             raise
         else:
             raise
+
+
+def az_logout():
+    profile = Profile()
+    profile.logout_all()
 
 
 def az_check_subscription():
@@ -368,20 +378,23 @@ def register_acs_providers():
             logger.info('%s is already registered', namespace)
 
 
-def az_create_kubernetes(resource_group, cluster_name, dns_prefix, ssh_key_value):
+def az_create_kubernetes(resource_group, cluster_name, dns_prefix, ssh_key_value,
+                         service_principal, client_secret):
     """
     Creates a new Kubernetes cluster through az. This can take up to 10 minutes.
     :param resource_group: The name of the resource group to add the cluster to.
     :param cluster_name: The name of the cluster being created
     :param dns_prefix: The dns prefix for the cluster.
     :param ssh_key_value: The absolute path to the ssh key used to set up the cluster.
+    :param service_principal: str name of service principal
+    :param client_secret: str client secret for service principal
 
     :return bool: If creation is successful, return true. Otherwise an exception will be raised.
     """
-    client = client_factory.get_mgmt_service_client(
+    acs_client = client_factory.get_mgmt_service_client(
         ContainerServiceClient).container_services
     try:
-        client.get(resource_group, cluster_name)
+        acs_client.get(resource_group, cluster_name)
         print("Kubernetes cluster with name {} already found. Skipping creation.".format(
             cluster_name))
         return
@@ -390,29 +403,34 @@ def az_create_kubernetes(resource_group, cluster_name, dns_prefix, ssh_key_value
             raise
 
     _, subscription_id, _ = Profile().get_login_credentials(subscription_id=None)
-
     register_acs_providers()
     client = _graph_client_factory()
-    principalObj = load_acs_service_principal(subscription_id)
+    if not service_principal:
+        principalObj = load_acs_service_principal(subscription_id)
+        if principalObj:
+            service_principal = principalObj.get('service_principal')
+            client_secret = principalObj.get('client_secret')
+            _validate_service_principal(client, service_principal)
+        else:
+            # Nothing to load, make one.
+            import binascii
+            client_secret = binascii.b2a_hex(os.urandom(10)).decode('utf-8')
+            salt = binascii.b2a_hex(os.urandom(3)).decode('utf-8')
+            url = 'http://{}.{}.{}.cloudapp.azure.com'.format(salt, dns_prefix, None)
 
-    if principalObj:
-        service_principal = principalObj.get('service_principal')
-        client_secret = principalObj.get('client_secret')
-        _validate_service_principal(client, service_principal)
+            service_principal = _build_service_principal(client, cluster_name, url,
+                                                         client_secret)
+            logger.info('Created a service principal: %s', service_principal)
+            store_acs_service_principal(subscription_id, client_secret, service_principal)
+        if not _add_role_assignment('Contributor', service_principal):
+            raise CLIError(
+                'Could not create a service principal with the right permissions. Are you an Owner on this project?')
     else:
-        # Nothing to load, make one.
-        import binascii
-        client_secret = binascii.b2a_hex(os.urandom(10)).decode('utf-8')
-        salt = binascii.b2a_hex(os.urandom(3)).decode('utf-8')
-        url = 'http://{}.{}.{}.cloudapp.azure.com'.format(salt, dns_prefix, None)
+        # --service-principal specfied, validate --client-secret was too
+        if not client_secret:
+            raise CLIError('--client-secret is required if --service-principal is specified')
+        _validate_service_principal(client, service_principal)
 
-        service_principal = _build_service_principal(client, cluster_name, url,
-                                                     client_secret)
-        logger.info('Created a service principal: %s', service_principal)
-        store_acs_service_principal(subscription_id, client_secret, service_principal)
-    if not _add_role_assignment('Contributor', service_principal):
-        raise CLIError(
-            'Could not create a service principal with the right permissions. Are you an Owner on this project?')
     return _create_kubernetes(resource_group, cluster_name, dns_prefix,
                               cluster_name,
                               ssh_key_value,

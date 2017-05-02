@@ -20,6 +20,7 @@ CLASSIFIERS = [
 ]
 
 DEPENDENCIES = [
+    'adal>=0.4.5',
     'azure-cli-core',
     'azure-graphrbac>=0.30.0rc6',
     'azure-mgmt-compute>=1.0.0rc1',

@@ -8,6 +8,7 @@ import types
 from collections import OrderedDict
 from builtins import input
 from builtins import next
+from azure.cli.core.util import CLIError
 from ._util import CommandLineInterfaceContext
 from ._util import acs_connection_timeout
 from ._util import create_ssh_key_if_not_exists
@@ -341,7 +342,8 @@ def write_acs_to_amlenvrc(acs_master, acs_agent, env_verb):
     print('')
 
 
-def env_setup(status, name, kubernetes, local_only, context=CommandLineInterfaceContext()):
+def env_setup(status, name, kubernetes, local_only, service_principal_app_id,
+              service_principal_password, context=CommandLineInterfaceContext()):
     if status:
         try:
             completed_deployment = az_check_template_deployment_status(status)
@@ -404,15 +406,11 @@ def env_setup(status, name, kubernetes, local_only, context=CommandLineInterface
             return
     else:
         root_name = name
-
-    try:
-        az_login()
-        if not name:
-            az_check_subscription()
-        resource_group = az_create_resource_group(context, root_name)
-    except AzureCliError as exc:
-        print(exc.message)
-        return
+    if service_principal_app_id and not service_principal_password:
+        raise CLIError('When deploying with service principal, password (-p) must be specified.')
+    az_login()
+    az_check_subscription()
+    resource_group = az_create_resource_group(context, root_name)
 
     app_insight_values_to_check = OrderedDict([
             ('App Insights Account Name', context.app_insights_account_name),
@@ -452,7 +450,8 @@ def env_setup(status, name, kubernetes, local_only, context=CommandLineInterface
                     ('Kubernetes Cluster Name', KubernetesOperations.get_cluster_name(context))
                 ])
             k8s_args = [context, root_name, resource_group, acr_login_server,
-                        acr_password, ssh_public_key, ssh_private_key_path]
+                        acr_password, ssh_public_key, ssh_private_key_path,
+                        service_principal_app_id, service_principal_password]
             k8s_configured = create_action_with_prompt_if_defined(
                 context,
                 'Kubernetes Cluster',
@@ -494,7 +493,6 @@ def env_setup(status, name, kubernetes, local_only, context=CommandLineInterface
             app_insights_account_name, app_insights_account_key = az_get_app_insights_account(completed_deployment)
             env_statements += ["{} AML_APP_INSIGHTS_NAME={}".format(env_verb, app_insights_account_name),
                       "{} AML_APP_INSIGHTS_KEY={}".format(env_verb, app_insights_account_key)]
-
 
     print('To configure az ml for local use with this environment, set the following environment variables.')
 
