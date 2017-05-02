@@ -1,3 +1,4 @@
+from __future__ import print_function
 from kubernetes import client, config
 from kubernetes.client.rest import ApiException
 from base64 import b64encode
@@ -59,13 +60,12 @@ class KubernetesOperations:
         try:
             api_response = client.ExtensionsV1beta1Api().read_namespaced_deployment_status(name=name,
                                                                                            namespace=namespace)
-            print("Currently have {0} available replicas".format(api_response.status.available_replicas))
-            return api_response.status.available_replicas == desired_replicas
+            return api_response.status.available_replicas == desired_replicas, api_response.status.available_replicas
         except ApiException as e:
             print("Exception when calling ExtensionsV1beta1Api->replace_namespaced_deployment_status: %s\n" % e)
             raise e
 
-    def create_deployment(self, deployment_yaml, namespace, deployment_name):
+    def create_deployment(self, deployment_yaml, namespace, deployment_name, verbose=False):
         """
         Starts the creation of a Kubernetes deployment.
         :param deployment_yaml: Path of the yaml file to deploy
@@ -77,7 +77,8 @@ class KubernetesOperations:
         print("Creating deployment {} in namespace {}".format(deployment_name, namespace))
         try:
             resp = k8s_beta.create_namespaced_deployment(namespace=namespace, body=deployment_yaml)
-            print("Deployment created. status= {} ".format(str(resp.status)))
+            if verbose:
+                print("Deployment created. status= {} ".format(str(resp.status)))
         except ApiException as e:
             exc_json = json.loads(e.body)
             if "AlreadyExists" in exc_json['reason']:
@@ -86,7 +87,8 @@ class KubernetesOperations:
                 print("An error occurred while creating the deployment. {}".format(exc_json['message']))
                 raise
 
-    def deploy_deployment(self, deployment_yaml, max_deployment_time_s, desired_replica_num, secret_name):
+    def deploy_deployment(self, deployment_yaml, max_deployment_time_s, desired_replica_num, secret_name,
+                          verbose=False):
         """
         Deploys a Kubernetes Deployment and waits for the deployment to complete.
         :param deployment_yaml: Path of the yaml file to deploy
@@ -94,6 +96,7 @@ class KubernetesOperations:
         :param desired_replica_num: Number of replica pods to create in the deployment
         :param secret_name: Name of the Kubernetes secret that contains the ACR login information for the image
                             specified in the deployment_yaml.
+        :param verbose: Verbose printing flag
         :return bool: True if the deployment succeeds.
         """
         with open(deployment_yaml) as f:
@@ -102,15 +105,22 @@ class KubernetesOperations:
         deployment_name = dep["metadata"]["name"]
         dep["spec"]["replicas"] = desired_replica_num
         dep["spec"]["template"]["spec"]["imagePullSecrets"][0]["name"] = secret_name
-        self.create_deployment(dep, namespace, deployment_name)
+        self.create_deployment(dep, namespace, deployment_name, verbose)
         start_time = time.time()
+        dot_string = '.'
         while time.time() - start_time < max_deployment_time_s:
-            print('Deployment Ongoing')
-            if self.is_deployment_completed(dep["metadata"]["name"], namespace, desired_replica_num):
+            is_complete, pods = self.is_deployment_completed(dep["metadata"]["name"], namespace, desired_replica_num)
+            pods = 0 if pods is None else pods
+            replica_string = 'Deploying {} / {} pods'.format(pods, desired_replica_num)
+            dot_string = '{}.'.format(dot_string)
+            print('{}{}'.format(replica_string, dot_string), end="\r")
+
+            if is_complete:
+                print('')
                 print("Deployment Complete")
                 return True
-            time.sleep(15)
-        print("Deployment failed, to get the desired number of pods")
+            time.sleep(5)
+        print("Deployment failed to get the desired number of pods")
         return False
 
     def expose_frontend(self, service_yaml):
@@ -313,7 +323,7 @@ class KubernetesOperations:
         except subprocess.CalledProcessError:
             print("Unable to scale service. {}")
 
-    def create_service(self, service_yaml, webservicename, webservice_type):
+    def create_service(self, service_yaml, webservicename, webservice_type, verbose=False):
         try:
             k8s_core = client.CoreV1Api()
             namespace = 'default'
@@ -324,7 +334,8 @@ class KubernetesOperations:
                 dep['metadata']['labels']['azuremlappname'] = str(webservicename)
                 dep['metadata']['labels']['webservicetype'] = str(webservice_type)
                 dep['spec']['selector']['webservicename'] = str(webservicename)
-                print("Payload: {0}".format(dep))
+                if verbose:
+                    print("Payload: {0}".format(dep))
                 k8s_core.create_namespaced_service(body=dep, namespace=namespace)
                 print("Created service with Name: {0}".format(webservicename))
         except ApiException as e:
