@@ -556,7 +556,6 @@ def realtime_service_create(score_file, dependencies, requirements, schema_file,
             else:
                 json_payload['properties']['deploymentPackage']['pipRequirements'] = location
 
-    dependency_injection_code = '\nimport tarfile\nimport os.path\n'
     dependency_count = 0
     if dependencies is not None:
         print('Uploading dependencies.')
@@ -571,23 +570,11 @@ def realtime_service_create(score_file, dependencies, requirements, schema_file,
                 # Add the new asset to the payload
                 new_asset = {'mimeType': 'application/octet-stream',
                              'id': str(dependency),
-                             'location': location}
+                             'location': location,
+                             'unzip': status == 1}
                 json_payload['properties']['assets'].append(new_asset)
                 if verbose:
                     print("Added dependency {} to assets.".format(dependency))
-
-                # If the asset was a directory, also add code to unzip and layout directory
-                if status == 1:
-                    dependency_injection_code = dependency_injection_code + \
-                                                'if os.path.exists("{}"):\n'.format(filename) + \
-                                                '  amlbdws_dependency_{} = tarfile.open("{}")\n'\
-                                                .format(dependency_count, filename)
-                    dependency_injection_code = dependency_injection_code + \
-                                                '  amlbdws_dependency_{}.extractall()\n'.format(dependency_count)
-
-    if verbose:
-        print("Code injected to unzip directories:\n{}".format(dependency_injection_code))
-        print(json.dumps(json_payload))
 
     # read in code file
     if os.path.isfile(score_file):
@@ -606,9 +593,9 @@ def realtime_service_create(score_file, dependencies, requirements, schema_file,
                       context.az_account_name + ".blob.core.windows.net','" + context.az_account_key + "')"
 
         # create blob with preamble code and user function definitions from cell
-        code = "{}\n{}\n{}\n{}\n\n\n{}".format(preamble, wasb_config, dependency_injection_code, code, get_sample_code)
+        code = "{}\n{}\n{}\n\n\n{}".format(preamble, wasb_config, code, get_sample_code)
     else:
-        code = "{}\n{}\n\n\n{}".format(dependency_injection_code, code, get_sample_code)
+        code = "{}\n\n\n{}".format(code, get_sample_code)
 
     if verbose:
         print(code)
