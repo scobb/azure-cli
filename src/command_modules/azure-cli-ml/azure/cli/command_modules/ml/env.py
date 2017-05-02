@@ -342,8 +342,8 @@ def write_acs_to_amlenvrc(acs_master, acs_agent, env_verb):
     print('')
 
 
-def env_setup(status, name, kubernetes, local_only, service_principal,
-              client_secret, context=CommandLineInterfaceContext()):
+def env_setup(status, name, kubernetes, local_only, service_principal_app_id,
+              service_principal_password, context=CommandLineInterfaceContext()):
     if status:
         try:
             completed_deployment = az_check_template_deployment_status(status)
@@ -407,7 +407,7 @@ def env_setup(status, name, kubernetes, local_only, service_principal,
     else:
         root_name = name
 
-    if service_principal and not client_secret:
+    if service_principal_app_id and not service_principal_password:
         raise AzureCliError('When deploying with service principal, client secret must be specified.')
     az_login()
     az_check_subscription()
@@ -452,7 +452,7 @@ def env_setup(status, name, kubernetes, local_only, service_principal,
                 ])
             k8s_args = [context, root_name, resource_group, acr_login_server,
                         acr_password, ssh_public_key, ssh_private_key_path,
-                        service_principal, client_secret]
+                        service_principal_app_id, service_principal_password]
             k8s_configured = create_action_with_prompt_if_defined(
                 context,
                 'Kubernetes Cluster',
