@@ -20,8 +20,8 @@ class RealtimeE2eTests(unittest.TestCase):
     kube_context.acr_home = 'stcobwink8s2acr.azurecr.io'
     kube_context.acr_user = 'stcobwink8s2acr'
     kube_context.acr_pw = '+=a=x=+=/i=Ix=mQL1Ar=mcDzsO/=ml/'
-    kube_context.app_insights_account_name = 'scwink8sacrapp_ins'
-    kube_context.app_insights_account_key = '913c6712-3cf5-4a71-8f28-6019b51b6af1'
+    kube_context.app_insights_account_name = 'stcobwink8s2app_ins'
+    kube_context.app_insights_account_key = 'e7f8cf3c-7ce0-428a-96d5-aeed56b92ad8'
 
     mesos_context = E2eContext()
     mesos_context.env_is_k8s = False
