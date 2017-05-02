@@ -735,7 +735,8 @@ def realtime_service_create(score_file, dependencies, requirements, schema_file,
     if context.in_local_mode():
         return realtime_service_deploy_local(context, image, verbose, app_insights_enabled, logging_level)
     elif context.env_is_k8s:
-        realtime_service_deploy_k8s(context, image, service_name, app_insights_enabled, logging_level, num_replicas)
+        realtime_service_deploy_k8s(context, image, service_name, app_insights_enabled, logging_level,
+                                    num_replicas, verbose)
     else:
         realtime_service_deploy(context, image, service_name, app_insights_enabled, logging_level, verbose)
 
@@ -797,7 +798,7 @@ def realtime_service_deploy(context, image, app_id, app_insights_enabled, loggin
     print("Usage: az ml service run realtime -n " + app_id + " [-d '{\"input\" : \"!! YOUR DATA HERE !!\"}']")
 
 
-def realtime_service_deploy_k8s(context, image, app_id, app_insights_enabled, logging_level, num_replicas):
+def realtime_service_deploy_k8s(context, image, app_id, app_insights_enabled, logging_level, num_replicas, verbose=False):
     """Deploy a realtime Kubernetes web service from a docker image."""
 
     k8s_template_path = os.path.join(os.path.dirname(os.path.abspath(__file__)),
@@ -831,8 +832,8 @@ def realtime_service_deploy_k8s(context, image, app_id, app_insights_enabled, lo
     k8s_ops = KubernetesOperations()
     timeout_seconds = 1200
     try:
-        k8s_ops.deploy_deployment(tmp_k8s_path, timeout_seconds, num_replicas, context.acr_user + 'acrkey')
-        k8s_ops.create_service(k8s_service_template_path, app_id, 'realtime')
+        k8s_ops.deploy_deployment(tmp_k8s_path, timeout_seconds, num_replicas, context.acr_user + 'acrkey', verbose)
+        k8s_ops.create_service(k8s_service_template_path, app_id, 'realtime', verbose)
 
         print("Success.")
         print("Usage: az ml service run realtime -n " + app_id + " [-d '{\"input\" : \"!! YOUR DATA HERE !!\"}']")
