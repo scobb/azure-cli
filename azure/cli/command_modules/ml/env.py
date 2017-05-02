@@ -8,6 +8,7 @@ import types
 from collections import OrderedDict
 from builtins import input
 from builtins import next
+from azure.cli.core.util import CLIError
 from ._util import CommandLineInterfaceContext
 from ._util import acs_connection_timeout
 from ._util import create_ssh_key_if_not_exists
@@ -26,7 +27,6 @@ from ._az_util import az_create_app_insights_account
 from ._az_util import az_create_acs
 from ._az_util import query_deployment_status
 from ._az_util import az_get_k8s_credentials
-from ._az_util import az_logout
 from ._k8s_util import KubernetesOperations
 from ._k8s_util import setup_k8s
 from ..ml import __version__
@@ -406,9 +406,8 @@ def env_setup(status, name, kubernetes, local_only, service_principal_app_id,
             return
     else:
         root_name = name
-
     if service_principal_app_id and not service_principal_password:
-        raise AzureCliError('When deploying with service principal, client secret must be specified.')
+        raise CLIError('When deploying with service principal, password (-p) must be specified.')
     az_login()
     az_check_subscription()
     resource_group = az_create_resource_group(context, root_name)
