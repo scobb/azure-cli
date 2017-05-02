@@ -20,6 +20,9 @@ from azure.mgmt.authorization.models import RoleAssignmentProperties
 from azure.cli.core._environment import get_config_dir
 
 
+service_principal_path = os.path.join(get_config_dir(), 'acsServicePrincipal.json')
+
+
 def _create_kubernetes(resource_group_name, deployment_name, dns_name_prefix,
                        name, ssh_key_value,
                        admin_username="azureuser", agent_count="3",
@@ -265,8 +268,7 @@ def _add_role_assignment(role, service_principal, delay=2, output=True):
 
 
 def store_acs_service_principal(subscription_id, client_secret, service_principal,
-                                config_path=os.path.join(get_config_dir(),
-                                                         'acsServicePrincipal.json')):
+                                config_path=service_principal_path):
     obj = {}
     if client_secret:
         obj['client_secret'] = client_secret
@@ -284,8 +286,7 @@ def store_acs_service_principal(subscription_id, client_secret, service_principa
 
 
 def load_acs_service_principal(subscription_id,
-                               config_path=os.path.join(get_config_dir(),
-                                                        'acsServicePrincipal.json')):
+                               config_path=service_principal_path):
     config = load_acs_service_principals(config_path)
     if not config:
         return None
@@ -405,7 +406,7 @@ def _validate_service_principal(client, sp_id):
     # discard the result, we're trusting this to throw if it can't find something
     try:
         show_service_principal(client.service_principals, sp_id)
-    except:  # pylint: disable=bare-except
+    except Exception:
         raise CLIError(
             'Failed to validate service principal, if this persists try deleting $HOME/.azure/acsServicePrincipal.json')
 

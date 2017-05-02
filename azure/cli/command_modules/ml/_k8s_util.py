@@ -8,6 +8,7 @@ import json
 import os
 import re
 import subprocess
+from urllib3.exceptions import MaxRetryError
 from builtins import input
 from ._az_util import az_create_kubernetes
 from ._az_util import az_get_k8s_credentials
@@ -15,7 +16,7 @@ from ._az_util import az_get_active_email
 from ._az_util import az_install_kubectl
 from ._az_util import InvalidNameError
 from ._az_util import AzureCliError
-
+from ._acs_util import service_principal_path
 
 class KubernetesOperations:
     def __init__(self, config_file=None):
@@ -334,7 +335,7 @@ class KubernetesOperations:
 
 
 def setup_k8s(context, root_name, resource_group, acr_login_server, acr_password, ssh_public_key,
-              ssh_private_key_path):
+              ssh_private_key_path, service_principal, client_secret):
     """
 
     Creates and configures a new Kubernetes Cluster on Azure with:
@@ -347,20 +348,37 @@ def setup_k8s(context, root_name, resource_group, acr_login_server, acr_password
     :param acr_password: The password for the user's ACR.
     :param ssh_public_key: Value of ssh public key
     :param ssh_private_key_path: str path to private key
+    :param service_principal: str name of service principal
+    :param client_secret: str client secret for service principal
 
     :return: None
     """
-    print('Setting up Kubernetes Cluster')
+    print('Setting up Kubernetes Cluster in ACS.')
     cluster_name = root_name + "-cluster"
     try:
         if not check_for_kubectl(context):
             return False
         acr_email = az_get_active_email()
-        az_create_kubernetes(resource_group, cluster_name, root_name, ssh_public_key)
+        az_create_kubernetes(resource_group, cluster_name, root_name, ssh_public_key,
+                             service_principal, client_secret)
         az_get_k8s_credentials(resource_group, cluster_name, ssh_private_key_path)
         k8s_ops = KubernetesOperations()
-        k8s_ops.add_acr_secret(context.acr_username + 'acrkey', context.acr_username, acr_login_server,
-                               acr_password, acr_email)
+        try:
+            k8s_ops.add_acr_secret(context.acr_username + 'acrkey', context.acr_username, acr_login_server,
+                                   acr_password, acr_email)
+        except MaxRetryError:
+            print('Failed to add secret to your Kubernetes cluster. '
+                  'This can occur if the service principal does not '
+                  'have the correct permissions on your subscription.')
+            if service_principal:
+                print('Please verify that your service principal has '
+                      'Contributor privileges on the subscription you are trying to '
+                      'provision in.')
+            else:
+                print('{} may be corrupted--delete it and try provisioning '
+                      'again.'.format(service_principal_path))
+            print('If this error persists, please contact deployml@microsoft.com.')
+            return False
         deploy_frontend(k8s_ops, acr_email)
 
     except InvalidNameError as exc:

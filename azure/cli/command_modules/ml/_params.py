@@ -72,3 +72,5 @@ register_cli_argument('ml env setup', 'status', options_list=('-s', '--status'),
 register_cli_argument('ml env setup', 'name', options_list=('-n', '--name'), metavar='envName', help='The name of your Azure ML environment (1-20 characters, alphanumeric only).', required=False)
 register_cli_argument('ml env setup', 'kubernetes', options_list=('-k', '--kubernetes'), action='store_true', help='Sets up a new Kubernetes cluster.', required=False)
 register_cli_argument('ml env setup', 'local_only', options_list=('-l', '--local-only'), action='store_true', help='Sets up only local mode (no ACS).', required=False)
+register_cli_argument('ml env setup', 'service_principal_app_id', options_list=('-a', '--service-principal-app-id'), help='App ID of service principal to use for configuring ACS cluster.', required=False)
+register_cli_argument('ml env setup', 'service_principal_password', options_list=('-p', '--service-principal-password'), help='Password associated with service principal.', required=False)
