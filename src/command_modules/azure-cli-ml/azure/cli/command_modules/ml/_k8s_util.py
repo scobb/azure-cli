@@ -16,7 +16,7 @@ from ._az_util import az_get_active_email
 from ._az_util import az_install_kubectl
 from ._az_util import InvalidNameError
 from ._az_util import AzureCliError
-
+from ._acs_util import service_principal_path
 
 class KubernetesOperations:
     def __init__(self, config_file=None):
@@ -376,8 +376,7 @@ def setup_k8s(context, root_name, resource_group, acr_login_server, acr_password
                       'provision in.')
             else:
                 print('{} may be corrupted--delete it and try provisioning '
-                      'again.'.format(os.path.join(os.path.expanduser('~'),
-                                                   '.azure', 'acsServicePrincipal.json')))
+                      'again.'.format(service_principal_path))
             print('If this error persists, please contact deployml@microsoft.com.')
             return False
         deploy_frontend(k8s_ops, acr_email)
