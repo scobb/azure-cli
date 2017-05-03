@@ -22,6 +22,9 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.backends import default_backend as crypto_default_backend
 import select
 
+
+import select
+
 try:
     # python 3
     from urllib.request import pathname2url

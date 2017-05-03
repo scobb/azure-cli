@@ -101,6 +101,7 @@ def env_cluster(verb, context=CommandLineInterfaceContext()):
             acs_is_set_up = forwarded_port > 0
         except:
             acs_is_set_up = False
+
         if not acs_is_set_up:
             continue_without_acs = context.get_input(
                 'Could not connect to ACS cluster. Continue with cluster mode anyway (y/N)? ')
