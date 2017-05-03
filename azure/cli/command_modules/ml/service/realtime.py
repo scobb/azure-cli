@@ -1168,7 +1168,7 @@ def realtime_service_run_kubernetes(context, service_name, input_data, verbose):
             print('Unable to reach the requested host.')
             print('If you just created this service, it may not be available yet. Please try again in a few minutes.')
         elif '%MatchError' in content or 'No such thing' in content:
-            print('Unable to find service with name {}'.format(service_name))
+            print('Unable to find service with name {}.'.format(service_name))
         print(content)
         return
 
