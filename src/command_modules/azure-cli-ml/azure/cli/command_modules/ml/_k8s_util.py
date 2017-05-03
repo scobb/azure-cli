@@ -55,7 +55,7 @@ class KubernetesOperations:
         :param name: Name of the deployment
         :param namespace: Namespace containing the deployment.
         :param desired_replicas: Number of replicas requested in the deployment.
-        :return bool: Returns true if deployment has successfully deployed desired_replicas pods.
+        :return (bool, int): ( True if deployment is complete, Number of currently available replicas )
         """
         try:
             api_response = client.ExtensionsV1beta1Api().read_namespaced_deployment_status(name=name,
