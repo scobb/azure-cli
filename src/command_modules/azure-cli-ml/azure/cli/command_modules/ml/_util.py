@@ -14,19 +14,26 @@ import json
 import sys
 import platform
 import socket
+import paramiko
+import threading
 from datetime import datetime, timedelta
 from cryptography.hazmat.primitives import serialization as crypto_serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.backends import default_backend as crypto_default_backend
 
+
+import select
+
 try:
     # python 3
     from urllib.request import pathname2url
     from urllib.parse import urljoin, urlparse  # pylint: disable=unused-import
+    import socketserver as SocketServer
 except ImportError:
     # python 2
     from urllib import pathname2url
     from urlparse import urljoin, urlparse
+    import SocketServer
 
 import subprocess
 import re
@@ -76,6 +83,37 @@ class CommandLineInterfaceContext(object):
             if outer_match_obj:
                 self.hdi_home = outer_match_obj.group('cluster_name')
         self.hdi_domain = self.hdi_home.split('.')[0] if self.hdi_home else None
+        self.forwarded_port = None
+
+    def set_up_mesos_port_forwarding(self):
+        """
+
+        :return: None
+        """
+        remote_host = self.acs_master_url
+        acs_username = 'acsadmin'
+        remote_port = 2200
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.bind(('', 0))
+        local_port = sock.getsockname()[1]
+        transport = paramiko.Transport((remote_host, remote_port))
+        try:
+            transport.connect(username=acs_username)
+            print(
+                'Forwarding local port {} to port 80 on your ACS cluster'.format(
+                    local_port))
+            # forward_tunnel(local_port, remote_host, remote_port, transport)
+            forwarding_thread = threading.Thread(target=forward_tunnel,
+                                                 args=(
+                                                 local_port, remote_host, remote_port,
+                                                 transport))
+            forwarding_thread.daemon = True
+            forwarding_thread.start()
+            self.forwarded_port = local_port
+            print('Success.')
+        except Exception as exc:
+            print('Port forwarding failed: {}'.format(exc))
+            raise
 
     @staticmethod
     def str_from_subprocess_communicate(output):
@@ -266,18 +304,65 @@ class CommandLineInterfaceContext(object):
 
         :return: int -1 if not set up, port if set up
         """
-
+        if not self.forwarded_port:
+            self.set_up_mesos_port_forwarding()
+        marathon_base_url = 'http://127.0.0.1:' + str(self.forwarded_port) + '/marathon/v2'
+        marathon_info_url = marathon_base_url + '/info'
         try:
-            conf = self.read_config()
-            if not conf:
-                return -1
-        except InvalidConfError:
-            return -1
+            requests.get(marathon_info_url)
+        except Exception as exc:
+            print('Exception: {}'.format(exc))
+        return self.forwarded_port
 
-        if 'port' in conf and is_int(conf['port']):
-            return int(conf['port'])
 
-        return -1
+class ForwardServer(SocketServer.ThreadingTCPServer):
+    daemon_threads = True
+    allow_reuse_address = True
+
+
+class Handler(SocketServer.BaseRequestHandler):
+    def handle(self):
+        try:
+            chan = self.ssh_transport.open_channel('direct-tcpip',
+                                                   (self.chain_host, self.chain_port),
+                                                   self.request.getpeername())
+        except Exception as e:
+            print('Incoming request to %s:%d failed: %s' % (self.chain_host,
+                                                            self.chain_port,
+                                                            repr(e)))
+            return
+        if chan is None:
+            print('Incoming request to %s:%d was rejected by the SSH server.' %
+                  (self.chain_host, self.chain_port))
+            return
+
+        while True:
+            r, w, x = select.select([self.request, chan], [], [])
+            if self.request in r:
+                data = self.request.recv(1024)
+                if len(data) == 0:
+                    break
+                chan.send(data)
+            if chan in r:
+                data = chan.recv(1024)
+                if len(data) == 0:
+                    break
+                self.request.send(data)
+
+        chan.close()
+        self.request.close()
+
+
+def forward_tunnel(local_port, remote_host, remote_port, transport):
+    # this is a little convoluted, but lets me configure things for the Handler
+    # object.  (SocketServer doesn't give Handlers any way to access the outer
+    # server normally.)
+    class SubHander(Handler):
+        chain_host = remote_host
+        chain_port = remote_port
+        ssh_transport = transport
+
+    ForwardServer(('', local_port), SubHander).serve_forever()
 
 
 class JupyterContext(CommandLineInterfaceContext):

@@ -37,37 +37,11 @@ def version():
 def acs_marathon_setup(context):
     """Helps set up port forwarding to an ACS cluster."""
     # TODO - use paramiko here to set up tunneling?
-    if context.os_is_linux():
-        print('Establishing connection to ACS cluster.')
-        acs_url = context.get_input(
-            'Enter ACS Master URL (default: {}): '.format(context.acs_master_url))
-        if acs_url is None or acs_url == '':
-            acs_url = context.acs_master_url
-            if acs_url is None or acs_url == '':
-                print('Error: no ACS URL provided.')
-                return False, -1
-
-        acs_username = context.get_input('Enter ACS username (default: acsadmin): ')
-        if acs_username is None or acs_username == '':
-            acs_username = 'acsadmin'
-
-        # Find a random unbound port
-        sock = context.get_socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.bind(('', 0))
-        local_port = sock.getsockname()[1]
-        print('Forwarding local port {} to port 80 on your ACS cluster'.format(
-            local_port))
-        try:
-            sock.close()
-            context.check_call(['ssh', '-L', '{}:localhost:80'.format(local_port),
-                                '-f', '-N', '{}@{}'.format(acs_username, acs_url), '-p',
-                                '2200'])
-            return True, local_port
-        except subprocess.CalledProcessError as ex:
-            print('Failed to set up ssh tunnel. Error code: {}'.format(ex.returncode))
-            return False, -1
-    print('Unable to automatically set port forwarding for Windows machines.')
-    return False, -1
+    try:
+        context.set_up_mesos_port_forwarding()
+        return True, context.check_marathon_port_forwarding()
+    except:
+        return False, -1
 
 
 def validate_acs_marathon(context, existing_port):
@@ -227,21 +201,13 @@ def env_cluster(force_connection, forwarded_port, verb, context=CommandLineInter
         conf = {}
 
     if not context.env_is_k8s:
-        # if -f was specified, try direct connection only
-        if force_connection:
-            (acs_is_setup, port) = validate_acs_marathon(context, 0)
-        # if only -p specified, without a port number, set up a new tunnel.
-        elif not forwarded_port:
-            (acs_is_setup, port) = acs_marathon_setup(context)
-        # if either no arguments specified (forwarded_port == -1), or -p NNNNN specified (forwarded_port == NNNNN),
-        # test for an existing connection (-1), or the specified port (NNNNN)
-        elif forwarded_port:
-            (acs_is_setup, port) = validate_acs_marathon(context, forwarded_port)
-        # This should never happen
-        else:
-            (acs_is_setup, port) = (False, -1)
+        try:
+            forwarded_port = context.check_marathon_port_forwarding()
+            acs_is_set_up = forwarded_port > 0
+        except:
+            acs_is_set_up = False
 
-        if not acs_is_setup:
+        if not acs_is_set_up:
             continue_without_acs = context.get_input(
                 'Could not connect to ACS cluster. Continue with cluster mode anyway (y/N)? ')
             continue_without_acs = continue_without_acs.strip().lower()
@@ -250,7 +216,6 @@ def env_cluster(force_connection, forwarded_port, verb, context=CommandLineInter
                     "Aborting switch to cluster mode. Please run 'az ml env about' for more information on setting up your cluster.")  # pylint: disable=line-too-long
                 return
 
-        conf['port'] = port
     else:
         basename = context.az_account_name[:-4]
         ssh_key_path = os.path.join(os.path.expanduser('~'), '.ssh', 'acs_id_rsa')
