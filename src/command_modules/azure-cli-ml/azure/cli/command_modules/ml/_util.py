@@ -104,14 +104,15 @@ class CommandLineInterfaceContext(object):
             print('*** Failed to connect to {}:{}: {}'.format(remote_host, remote_port, e))
             import traceback
             traceback.print_exc()
-        sock = socket.socket()
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.bind(('', 0))
         local_port = sock.getsockname()[1]
         try:
             forwarding_thread = threading.Thread(target=forward_tunnel,
-                                                 args=(
-                                                     local_port, '127.0.0.1', 80,
-                                                 client.get_transport()))
+                                                 args=(local_port,
+                                                       '127.0.0.1',
+                                                       80,
+                                                       client.get_transport()))
             forwarding_thread.daemon = True
             forwarding_thread.start()
             self.forwarded_port = local_port
