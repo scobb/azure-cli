@@ -93,61 +93,26 @@ class CommandLineInterfaceContext(object):
         remote_host = self.acs_master_url
         acs_username = 'acsadmin'
         remote_port = 2200
-        # sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        # sock.bind(('', 0))
-        # client = paramiko.SSHClient()
+        client = paramiko.SSHClient()
         acs_key_fp = os.path.join(os.path.expanduser('~'), '.ssh', 'acs_id_rsa_stcobmesos')
-        # client.load_host_keys(acs_key_fp)
-        # client.set_missing_host_key_policy(paramiko.WarningPolicy())
-        # print('Connecting to ssh host {}:{}...'.format(remote_host, remote_port))
-        # try:
-        #     client.connect(remote_host, remote_port, username=acs_username,
-        #                    key_filename=acs_key_fp)
-        # except Exception as e:
-        #     print('*** Failed to connect to {}:{}: {}'.format(remote_host, remote_port, e))
-        #     import traceback
-        #     traceback.print_exc()
-
-        # stdin, stdout, stderr = client.exec_command('pwd')
-        # print(stdout.readlines())
-        local_port = 5432
-        # local_port = sock.getsockname()[1]
-        # transport = paramiko.Transport((remote_host, remote_port))
+        client.load_host_keys(acs_key_fp)
+        client.set_missing_host_key_policy(paramiko.WarningPolicy())
         try:
-            from sshtunnel import SSHTunnelForwarder
-            server = SSHTunnelForwarder(
-                (remote_host, remote_port),
-                ssh_username=acs_username,
-                ssh_pkey=acs_key_fp,
-                remote_bind_address=('127.0.0.1', 80),
-                local_bind_address=('127.0.0.1', local_port)
-            )
-            server.start()
-            print('started: returning {}'.format(local_port))
-            self.forwarded_port = local_port
-            return
+            client.connect(remote_host, remote_port, username=acs_username,
+                           key_filename=acs_key_fp)
+        except Exception as e:
+            print('*** Failed to connect to {}:{}: {}'.format(remote_host, remote_port, e))
+            import traceback
+            traceback.print_exc()
 
-            # transport.connect(username=acs_username)
-            forward_tunnel(local_port, remote_host, 80, client.get_transport())
-            print(
-                'Forwarding local port {} to port 80 on your ACS cluster'.format(
-                    local_port))
-            forwarding_thread = threading.Thread(target=reverse_forward_tunnel,
+        local_port = 5432
+        try:
+            forwarding_thread = threading.Thread(target=forward_tunnel,
                                                  args=(
-                                                     local_port, remote_host, remote_port,
+                                                     local_port, '127.0.0.1', 80,
                                                  client.get_transport()))
             forwarding_thread.daemon = True
             forwarding_thread.start()
-            print('started.')
-            # forward_tunnel(local_port, remote_host, remote_port, transport)
-            # forwarding_thread = threading.Thread(target=forward_tunnel,
-            #                                      args=(
-            #                                      local_port, remote_host, remote_port,
-            #                                      transport))
-            # forwarding_thread.daemon = True
-            # forwarding_thread.start()
-            # self.forwarded_port = local_port
-            print('Success.')
             self.forwarded_port = local_port
         except Exception as exc:
             print('Port forwarding failed: {}'.format(exc))
@@ -347,12 +312,9 @@ class CommandLineInterfaceContext(object):
         marathon_base_url = 'http://127.0.0.1:' + str(self.forwarded_port) + '/marathon/v2'
         marathon_info_url = marathon_base_url + '/info'
         try:
-            print('Requesting {}'.format(marathon_info_url))
             requests.get(marathon_info_url)
         except Exception as exc:
             print('Exception: {}'.format(exc))
-            import traceback
-            traceback.print_exc()
         return self.forwarded_port
 
 
@@ -417,13 +379,9 @@ class ForwardServer(SocketServer.ThreadingTCPServer):
 class Handler(SocketServer.BaseRequestHandler):
     def handle(self):
         try:
-            print('Handling request.')
-            print('Opening direct-tcpip to {}:{} from {}'.format(self.chain_host, self.chain_port,
-                                                                 self.request.getpeername()))
             chan = self.ssh_transport.open_channel('direct-tcpip',
                                                    (self.chain_host, self.chain_port),
                                                    self.request.getpeername())
-            print('chan: {}'.format(chan))
         except Exception as e:
             print('Incoming request to %s:%d failed: %s' % (self.chain_host,
                                                             self.chain_port,
@@ -436,20 +394,14 @@ class Handler(SocketServer.BaseRequestHandler):
             return
 
         while True:
-            print('Selecting')
             r, w, x = select.select([self.request, chan], [], [])
-            print('r: {}'.format(r))
-            print('w: {}'.format(w))
-            print('x: {}'.format(x))
             if self.request in r:
                 data = self.request.recv(1024)
-                print('Request data:\n{}'.format(data))
                 if len(data) == 0:
                     break
                 chan.send(data)
             if chan in r:
                 data = chan.recv(1024)
-                print('Response data:\n{}'.format(data))
                 if len(data) == 0:
                     break
                 self.request.send(data)
