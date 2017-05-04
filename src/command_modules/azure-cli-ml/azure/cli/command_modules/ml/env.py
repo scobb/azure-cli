@@ -157,11 +157,6 @@ def env_describe(context=CommandLineInterfaceContext()):
         else:
             print('ACS Master URL         : {}'.format(context.acs_master_url))
             print('ACS Agent URL          : {}'.format(context.acs_agent_url))
-            forwarded_port = check_marathon_port_forwarding(context)
-            if forwarded_port > 0:
-                print('ACS Port forwarding    : ON, port {}'.format(forwarded_port))
-            else:
-                print('ACS Port forwarding    : OFF')
 
 
 def env_local(verb, context=CommandLineInterfaceContext()):
