@@ -1139,13 +1139,6 @@ def realtime_service_run_cluster(context, service_name, input_data, verbose):
 
 
 def realtime_service_run_kubernetes(context, service_name, input_data, verbose):
-    ops = KubernetesOperations()
-    try:
-        ops.get_service(service_name)
-    except ApiException:
-        print("Unable to find service with name {}".format(service_name))
-        return
-
     headers = {'Content-Type': 'application/json'}
     try:
         frontend_service_url = get_k8s_frontend_url()
@@ -1167,9 +1160,10 @@ def realtime_service_run_kubernetes(context, service_name, input_data, verbose):
         if content == "ehostunreach":
             print('Unable to reach the requested host.')
             print('If you just created this service, it may not be available yet. Please try again in a few minutes.')
-        elif '%MatchError' in content:
-            print('Unable to find service with name {}'.format(service_name))
-        print(content)
+        elif '%MatchError' in content or 'No such thing' in content:
+            print('Unable to find service with name {}.'.format(service_name))
+        else:
+            print(content)
         return
 
     try:
