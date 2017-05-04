@@ -36,133 +36,6 @@ def version():
     print('Azure Machine Learning Command Line Tools {}'.format(__version__))
 
 
-def acs_marathon_setup(context):
-    """Helps set up port forwarding to an ACS cluster."""
-    # TODO - use paramiko here to set up tunneling?
-    if context.os_is_linux():
-        print('Establishing connection to ACS cluster.')
-        acs_url = context.get_input(
-            'Enter ACS Master URL (default: {}): '.format(context.acs_master_url))
-        if acs_url is None or acs_url == '':
-            acs_url = context.acs_master_url
-            if acs_url is None or acs_url == '':
-                print('Error: no ACS URL provided.')
-                return False, -1
-
-        acs_username = context.get_input('Enter ACS username (default: acsadmin): ')
-        if acs_username is None or acs_username == '':
-            acs_username = 'acsadmin'
-
-        # Find a random unbound port
-        sock = context.get_socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.bind(('', 0))
-        local_port = sock.getsockname()[1]
-        print('Forwarding local port {} to port 80 on your ACS cluster'.format(
-            local_port))
-        try:
-            sock.close()
-            context.check_call(['ssh', '-L', '{}:localhost:80'.format(local_port),
-                                '-f', '-N', '{}@{}'.format(acs_username, acs_url), '-p',
-                                '2200'])
-            return True, local_port
-        except subprocess.CalledProcessError as ex:
-            print('Failed to set up ssh tunnel. Error code: {}'.format(ex.returncode))
-            return False, -1
-    print('Unable to automatically set port forwarding for Windows machines.')
-    return False, -1
-
-
-def validate_acs_marathon(context, existing_port):
-    """
-
-    Tests whether a valid connection to an ACS cluster exists.
-    :param existing_port: If -1, check for an existing configuration setting indicating port forwarding in ~/.amlconf.
-                          If 0, check for a direct connection to the ACS cluster specified in $AML_ACS_MASTER.
-                          If > 0, check for port forwarding to the specified port.
-    :return: (bool,int) - First value indicates whether a successful connection was made. Second value indicates the
-                          port on which the connection was made. 0 indicates direct connection. Any other positive
-                          integer indicates port forwarding is ON to that port.
-    """
-    if existing_port < 0:
-        existing_port = check_marathon_port_forwarding(context)
-
-    # port forwarding was previously setup, verify that it still works
-    if existing_port > 0:
-        marathon_base_url = 'http://127.0.0.1:' + str(existing_port) + '/marathon/v2'
-        marathon_info_url = marathon_base_url + '/info'
-
-        try:
-            marathon_info = context.http_call('get', marathon_info_url,
-                                              timeout=acs_connection_timeout)
-        except (requests.ConnectionError, requests.exceptions.ReadTimeout):
-            print('Marathon endpoint not available at {}'.format(marathon_base_url))
-            config_port = check_marathon_port_forwarding(context)
-            if config_port == 0:
-                print(
-                    'Found previous direct connection to ACS cluster. Checking if it still works.')
-                return validate_acs_marathon(context, config_port)
-            elif config_port > 0 and config_port != existing_port:
-                print(
-                    'Found previous port forwarding set up at {}. Checking if it still works.'.format(
-                        config_port))
-                return validate_acs_marathon(context, config_port)
-            return acs_marathon_setup(context)
-        try:
-            marathon_info = marathon_info.json()
-        except ValueError:
-            print('Marathon endpoint not available at {}'.format(marathon_base_url))
-            return acs_marathon_setup(context)
-        if 'name' in marathon_info and 'version' in marathon_info and marathon_info[
-            'name'] == 'marathon':
-            print(
-                'Successfully tested ACS connection. Found marathon endpoint at {}'.format(
-                    marathon_base_url))
-            return (True, existing_port)
-        else:
-            print('Marathon endpoint not available at {}'.format(marathon_base_url))
-            return acs_marathon_setup(context)
-
-    # direct connection was previously setup, or is being requested, verify that it works
-    elif existing_port == 0:
-        if context.acs_master_url is not None and context.acs_master_url != '':
-            marathon_base_url = 'http://' + context.acs_master_url + '/marathon/v2'
-            print(
-                'Trying direct connection to ACS cluster at {}'.format(marathon_base_url))
-            marathon_info_url = marathon_base_url + '/info'
-            try:
-                marathon_info = context.http_call('get', marathon_info_url,
-                                                  timeout=acs_connection_timeout)
-            except (requests.ConnectionError, requests.exceptions.ReadTimeout):
-                print('Marathon endpoint not available at {}'.format(marathon_base_url))
-                return (False, -1)
-            try:
-                marathon_info = marathon_info.json()
-            except ValueError:
-                print('Marathon endpoint not available at {}'.format(marathon_base_url))
-                return (False, -1)
-            if 'name' in marathon_info and 'version' in marathon_info and marathon_info[
-                'name'] == 'marathon':
-                print(
-                    'Successfully tested ACS connection. Found marathon endpoint at {}'.format(
-                        marathon_base_url))
-                return (True, 0)
-            else:
-                print('Marathon endpoint not available at {}'.format(marathon_base_url))
-                return (False, -1)
-        else:
-            return (False, -1)
-
-    # No connection previously setup
-    else:
-        # Try ssh tunnel first
-        (forwarding_set, port) = acs_marathon_setup(context)
-        if not forwarding_set:
-            # Try direct connection
-            return validate_acs_marathon(context, 0)
-        else:
-            return (forwarding_set, port)
-
-
 def env_about():
     """Help on setting up an AML environment."""
 
@@ -210,14 +83,8 @@ def env_about():
     """)
 
 
-def env_cluster(force_connection, forwarded_port, verb, context=CommandLineInterfaceContext()):
+def env_cluster(verb, context=CommandLineInterfaceContext()):
     """Switches environment to cluster mode."""
-
-    if force_connection and forwarded_port != -1:
-        print('Unable to force direct connection when -p is specified.')
-        print('Please use -f and -p exclusively.')
-        return
-
     try:
         conf = context.read_config()
         if not conf:
@@ -229,21 +96,12 @@ def env_cluster(force_connection, forwarded_port, verb, context=CommandLineInter
         conf = {}
 
     if not context.env_is_k8s:
-        # if -f was specified, try direct connection only
-        if force_connection:
-            (acs_is_setup, port) = validate_acs_marathon(context, 0)
-        # if only -p specified, without a port number, set up a new tunnel.
-        elif not forwarded_port:
-            (acs_is_setup, port) = acs_marathon_setup(context)
-        # if either no arguments specified (forwarded_port == -1), or -p NNNNN specified (forwarded_port == NNNNN),
-        # test for an existing connection (-1), or the specified port (NNNNN)
-        elif forwarded_port:
-            (acs_is_setup, port) = validate_acs_marathon(context, forwarded_port)
-        # This should never happen
-        else:
-            (acs_is_setup, port) = (False, -1)
-
-        if not acs_is_setup:
+        try:
+            forwarded_port = context.check_marathon_port_forwarding()
+            acs_is_set_up = forwarded_port > 0
+        except:
+            acs_is_set_up = False
+        if not acs_is_set_up:
             continue_without_acs = context.get_input(
                 'Could not connect to ACS cluster. Continue with cluster mode anyway (y/N)? ')
             continue_without_acs = continue_without_acs.strip().lower()
@@ -251,8 +109,6 @@ def env_cluster(force_connection, forwarded_port, verb, context=CommandLineInter
                 print(
                     "Aborting switch to cluster mode. Please run 'az ml env about' for more information on setting up your cluster.")  # pylint: disable=line-too-long
                 return
-
-        conf['port'] = port
     else:
         basename = context.az_account_name[:-4]
         ssh_key_path = os.path.join(os.path.expanduser('~'), '.ssh', 'acs_id_rsa')
@@ -295,11 +151,6 @@ def env_describe(context=CommandLineInterfaceContext()):
         else:
             print('ACS Master URL         : {}'.format(context.acs_master_url))
             print('ACS Agent URL          : {}'.format(context.acs_agent_url))
-            forwarded_port = check_marathon_port_forwarding(context)
-            if forwarded_port > 0:
-                print('ACS Port forwarding    : ON, port {}'.format(forwarded_port))
-            else:
-                print('ACS Port forwarding    : OFF')
 
 
 def env_local(verb, context=CommandLineInterfaceContext()):
