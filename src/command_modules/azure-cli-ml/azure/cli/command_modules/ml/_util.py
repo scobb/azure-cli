@@ -96,7 +96,9 @@ class CommandLineInterfaceContext(object):
         client = paramiko.SSHClient()
         acs_key_fp = os.path.join(os.path.expanduser('~'), '.ssh', 'acs_id_rsa_stcobmesos')
         client.load_host_keys(acs_key_fp)
-        client.set_missing_host_key_policy(paramiko.WarningPolicy())
+
+        # base class is silent
+        client.set_missing_host_key_policy(paramiko.MissingHostKeyPolicy())
         try:
             client.connect(remote_host, remote_port, username=acs_username,
                            key_filename=acs_key_fp)
@@ -104,8 +106,9 @@ class CommandLineInterfaceContext(object):
             print('*** Failed to connect to {}:{}: {}'.format(remote_host, remote_port, e))
             import traceback
             traceback.print_exc()
-
-        local_port = 5432
+        sock = socket.socket()
+        sock.bind(('', 0))
+        local_port = sock.getsockname()[1]
         try:
             forwarding_thread = threading.Thread(target=forward_tunnel,
                                                  args=(
@@ -315,23 +318,8 @@ class CommandLineInterfaceContext(object):
             requests.get(marathon_info_url)
         except Exception as exc:
             print('Exception: {}'.format(exc))
+            raise
         return self.forwarded_port
-
-
-def reverse_forward_tunnel(server_port, remote_host, remote_port, transport):
-    import threading
-    transport.request_port_forward('', server_port)
-
-    while True:
-
-        chan = transport.accept(1000)
-
-        if chan is None:
-            continue
-
-        thr = threading.Thread(target=handler, args=(chan, remote_host, remote_port))
-        thr.setDaemon(True)
-        thr.start()
 
 
 def handler(chan, host, port):
