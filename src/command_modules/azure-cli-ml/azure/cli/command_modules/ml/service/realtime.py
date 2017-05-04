@@ -58,7 +58,7 @@ def realtime_service_delete_local(service_name, verbose):
 
     try:
         dockerps_output = subprocess.check_output(
-            ["docker", "ps", "--filter", "\"label=amlid={}\""
+            ["docker", "ps", "--filter", "label=amlid={}"
              .format(service_name)]).decode('ascii').rstrip().split("\n")[1:]
     except subprocess.CalledProcessError:
         print('[Local mode] Error retrieving running containers. Please ensure you have permissions to run docker.')
@@ -111,7 +111,7 @@ def get_local_realtime_service_port(service_name, verbose):
 
     try:
         dockerps_output = subprocess.check_output(
-            ["docker", "ps", "--filter", "\"label=amlid={}\"".format(service_name)]).decode('ascii').rstrip().split("\n") #pylint: disable=line-too-long
+            ["docker", "ps", "--filter", "label=amlid={}".format(service_name)]).decode('ascii').rstrip().split("\n") #pylint: disable=line-too-long
     except subprocess.CalledProcessError:
         return -1
     if verbose:
@@ -851,7 +851,7 @@ def realtime_service_view(service_name=None, verb=False, context=cli_context):
     if context.in_local_mode():
         try:
             dockerps_output = subprocess.check_output(
-                ["docker", "ps", "--filter", "\"label=amlid={}\"".format(service_name)])
+                ["docker", "ps", "--filter", "label=amlid={}".format(service_name)])
             dockerps_output = dockerps_output.decode('ascii').rstrip().split("\n")[1:]
         except subprocess.CalledProcessError:
             print('[Local mode] Error retrieving container details. Make sure you can run docker.')
@@ -932,9 +932,9 @@ def _realtime_service_list(service_name=None, verb=False, context=cli_context):
 
     if context.in_local_mode():
         if service_name is not None:
-            filter_expr = "\"label=amlid={}\"".format(service_name)
+            filter_expr = "label=amlid={}".format(service_name)
         else:
-            filter_expr = "\"label=amlid\""
+            filter_expr = "label=amlid"
 
         try:
             dockerps_output = subprocess.check_output(
