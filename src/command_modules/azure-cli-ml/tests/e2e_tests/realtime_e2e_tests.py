@@ -50,17 +50,26 @@ class RealtimeE2eTests(unittest.TestCase):
         remote_host = RealtimeE2eTests.mesos_context.acs_master_url
         remote_port = 2200
         transport = paramiko.Transport((remote_host, remote_port))
-        transport.connect(username='acsadmin')
-        try:
-            print(
-            'Forwarding local port {} to port 80 on your ACS cluster'.format(local_port))
-            forwarding_thread = threading.Thread(target=forward_tunnel,
-                                                 args=(local_port, remote_host, remote_port, transport))
-            forwarding_thread.daemon = True
-            forwarding_thread.start()
-            return forwarding_thread, local_port
-        except Exception as exc:
-            print 'Port forwarding failed: {}'.format(exc)
+        transport.connect()
+        # transport = paramiko.Transport((remote_host, remote_port))
+        print(
+        'Forwarding local port {} to port 80 on your ACS cluster'.format(local_port))
+        forwarding_thread = threading.Thread(target=reverse_forward_tunnel,
+                                             args=(local_port, remote_host, remote_port, transport))
+        forwarding_thread.start()
+        print('started.')
+        # transport.connect(username='acsadmin')
+        #
+        # try:
+        #     print(
+        #     'Forwarding local port {} to port 80 on your ACS cluster'.format(local_port))
+        #     forwarding_thread = threading.Thread(target=forward_tunnel,
+        #                                          args=(local_port, remote_host, remote_port, transport))
+        #     forwarding_thread.daemon = True
+        #     forwarding_thread.start()
+        #     return forwarding_thread, local_port
+        # except Exception as exc:
+        #     print 'Port forwarding failed: {}'.format(exc)
 
 
     def test_list_local(self):

@@ -102,14 +102,21 @@ class CommandLineInterfaceContext(object):
             print(
                 'Forwarding local port {} to port 80 on your ACS cluster'.format(
                     local_port))
-            # forward_tunnel(local_port, remote_host, remote_port, transport)
-            forwarding_thread = threading.Thread(target=forward_tunnel,
+            forwarding_thread = threading.Thread(target=reverse_forward_tunnel,
                                                  args=(
                                                  local_port, remote_host, remote_port,
                                                  transport))
             forwarding_thread.daemon = True
             forwarding_thread.start()
-            self.forwarded_port = local_port
+            print('started.')
+            # forward_tunnel(local_port, remote_host, remote_port, transport)
+            # forwarding_thread = threading.Thread(target=forward_tunnel,
+            #                                      args=(
+            #                                      local_port, remote_host, remote_port,
+            #                                      transport))
+            # forwarding_thread.daemon = True
+            # forwarding_thread.start()
+            # self.forwarded_port = local_port
             print('Success.')
         except Exception as exc:
             print('Port forwarding failed: {}'.format(exc))
@@ -313,6 +320,59 @@ class CommandLineInterfaceContext(object):
         except Exception as exc:
             print('Exception: {}'.format(exc))
         return self.forwarded_port
+
+
+def reverse_forward_tunnel(server_port, remote_host, remote_port, transport):
+    import threading
+    transport.request_port_forward('', server_port)
+
+    while True:
+
+        chan = transport.accept(1000)
+
+        if chan is None:
+            continue
+
+        thr = threading.Thread(target=handler, args=(chan, remote_host, remote_port))
+        thr.setDaemon(True)
+        thr.start()
+
+
+def handler(chan, host, port):
+    import socket
+    import select
+    sock = socket.socket()
+
+    try:
+        sock.connect((host, port))
+
+    except Exception as e:
+        print('Forwarding request to %s:%d failed: %r' % (host, port, e))
+
+    print ('Connected! Tunnel open %r -&gt; %r -&gt; %r' % (chan.origin_addr,
+                   chan.getpeername(), (host, port)))
+
+    while True:
+
+        r, w, x = select.select([sock, chan], [], [])
+
+        if sock in r:
+            data = sock.recv(1024)
+            if len(data) == 0:
+                break
+            chan.send(data)
+            if chan in r:
+                data = chan.recv(1024)
+
+                if len(data) == 0:
+
+                    break
+
+                sock.send(data)
+
+                chan.close()
+
+        sock.close()
 
 
 class ForwardServer(SocketServer.ThreadingTCPServer):
