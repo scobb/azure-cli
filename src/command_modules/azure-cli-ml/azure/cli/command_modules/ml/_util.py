@@ -92,7 +92,7 @@ class CommandLineInterfaceContext(object):
         acs_username = 'acsadmin'
         remote_port = 2200
         client = paramiko.SSHClient()
-        acs_key_fp = os.path.join(os.path.expanduser('~'), '.ssh', 'acs_id_rsa_stcobmesos')
+        acs_key_fp = os.path.join(os.path.expanduser('~'), '.ssh', 'acs_id_rsa')
         client.load_host_keys(acs_key_fp)
 
         # base class is silent
