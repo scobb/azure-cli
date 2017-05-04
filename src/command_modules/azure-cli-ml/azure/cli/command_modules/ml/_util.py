@@ -95,17 +95,31 @@ class CommandLineInterfaceContext(object):
         remote_port = 2200
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.bind(('', 0))
-        local_port = sock.getsockname()[1]
-        transport = paramiko.Transport((remote_host, remote_port))
+        client = paramiko.SSHClient()
+        acs_key_fp = os.path.join(os.path.expanduser('~'), '.ssh', 'acs_id_rsa')
+        client.load_host_keys(acs_key_fp)
+        client.set_missing_host_key_policy(paramiko.WarningPolicy())
+        print('Connecting to ssh host {}:{}...'.format(remote_host, remote_port))
         try:
-            transport.connect(username=acs_username)
+            client.connect(remote_host, remote_port, username=acs_username,
+                           key_filename=acs_key_fp)
+        except Exception as e:
+            print('*** Failed to connect to {}:{}: {}'.format(remote_host, remote_port, e))
+            import traceback
+            traceback.print_exc()
+
+        # return
+        local_port = sock.getsockname()[1]
+        # transport = paramiko.Transport((remote_host, remote_port))
+        try:
+            # transport.connect(username=acs_username)
             print(
                 'Forwarding local port {} to port 80 on your ACS cluster'.format(
                     local_port))
-            forwarding_thread = threading.Thread(target=reverse_forward_tunnel,
+            forwarding_thread = threading.Thread(target=forward_tunnel,
                                                  args=(
                                                  local_port, remote_host, remote_port,
-                                                 transport))
+                                                 client.get_transport()))
             forwarding_thread.daemon = True
             forwarding_thread.start()
             print('started.')
@@ -118,6 +132,7 @@ class CommandLineInterfaceContext(object):
             # forwarding_thread.start()
             # self.forwarded_port = local_port
             print('Success.')
+            self.forwarded_port = local_port
         except Exception as exc:
             print('Port forwarding failed: {}'.format(exc))
             raise
@@ -316,9 +331,12 @@ class CommandLineInterfaceContext(object):
         marathon_base_url = 'http://127.0.0.1:' + str(self.forwarded_port) + '/marathon/v2'
         marathon_info_url = marathon_base_url + '/info'
         try:
+            print('Requesting {}'.format(marathon_info_url))
             requests.get(marathon_info_url)
         except Exception as exc:
             print('Exception: {}'.format(exc))
+            import traceback
+            traceback.print_exc()
         return self.forwarded_port
 
 
