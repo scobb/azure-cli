@@ -36,33 +36,6 @@ class RealtimeE2eTests(unittest.TestCase):
     mesos_context.acs_master_url = 'stcobmesosacsmaster.eastus.cloudapp.azure.com'
     mesos_context.acs_agent_url = 'stcobmesosacsagent.eastus.cloudapp.azure.com'
 
-    @staticmethod
-    def set_up_tunnel():
-        from forward import forward_tunnel
-        import socket
-        import paramiko
-
-        # Command for paramiko-1.7.7.1
-        # Find a random unbound port
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.bind(('', 0))
-        local_port = sock.getsockname()[1]
-        remote_host = RealtimeE2eTests.mesos_context.acs_master_url
-        remote_port = 2200
-        transport = paramiko.Transport((remote_host, remote_port))
-        transport.connect(username='acsadmin')
-        try:
-            print(
-            'Forwarding local port {} to port 80 on your ACS cluster'.format(local_port))
-            forwarding_thread = threading.Thread(target=forward_tunnel,
-                                                 args=(local_port, remote_host, remote_port, transport))
-            forwarding_thread.daemon = True
-            forwarding_thread.start()
-            return forwarding_thread, local_port
-        except Exception as exc:
-            print 'Port forwarding failed: {}'.format(exc)
-
-
     def test_list_local(self):
         c = E2eContext()
         c.local_mode = True
@@ -74,19 +47,12 @@ class RealtimeE2eTests(unittest.TestCase):
         self.assertTrue(output.endswith('-----+'))
 
     def test_list_mesos(self):
-        thread = None
-        try:
-            thread, self.mesos_context.forwarded_port = self.set_up_tunnel()
-            realtime_service_list(context=self.mesos_context)
+        realtime_service_list(context=self.mesos_context)
 
-            if not hasattr(sys.stdout, "getvalue"):
-                self.fail("need to run in buffered mode")
-            output = sys.stdout.getvalue().strip()
-            self.assertEqual(output, '')
-        finally:
-            if thread:
-                thread.terminate()
-                thread.join()
+        if not hasattr(sys.stdout, "getvalue"):
+            self.fail("need to run in buffered mode")
+        output = sys.stdout.getvalue().strip()
+        self.assertEqual(output, '')
 
     def test_list_kubernetes(self):
         realtime_service_list(context=self.kube_context)
@@ -96,58 +62,7 @@ class RealtimeE2eTests(unittest.TestCase):
         self.assertTrue(output.startswith('+------'))
         self.assertTrue(output.endswith('-----+'))
 
-def reverse_forward_tunnel(server_port, remote_host, remote_port, transport):
-    import threading
-    transport.request_port_forward('', server_port)
 
-    while True:
-
-        chan = transport.accept(1000)
-
-        if chan is None:
-            continue
-
-        thr = threading.Thread(target=handler, args=(chan, remote_host, remote_port))
-        thr.setDaemon(True)
-        thr.start()
-
-def handler(chan, host, port):
-    import socket
-    import select
-    sock = socket.socket()
-
-    try:
-        sock.connect((host, port))
-
-    except Exception as e:
-        print('Forwarding request to %s:%d failed: %r' % (host, port, e))
-
-    print ('Connected! Tunnel open %r -&gt; %r -&gt; %r' % (chan.origin_addr,
-                   chan.getpeername(), (host, port)))
-
-    while True:
-
-        r, w, x = select.select([sock, chan], [], [])
-
-        if sock in r:
-            data = sock.recv(1024)
-            if len(data) == 0:
-                break
-            chan.send(data)
-            if chan in r:
-                data = chan.recv(1024)
-
-                if len(data) == 0:
-
-                    break
-
-                sock.send(data)
-
-                chan.close()
-
-        sock.close()
-
-    print('Tunnel closed from %r' % (chan.origin_addr,))
 if __name__ == '__main__':
     assert not hasattr(sys.stdout, "getvalue")
     unittest.main(module=__name__, buffer=True, exit=False)

@@ -120,8 +120,8 @@ def resolve_marathon_base_url(context):
     if forwarded_port > 0:
         marathon_base_url = 'http://127.0.0.1:' + str(forwarded_port)
     else:
-        if os.environ.get('AML_ACS_MASTER') is not None:
-            cluster = os.environ.get('AML_ACS_MASTER')
+        if context.acs_master_url is not None:
+            cluster = context.acs_master_url
             marathon_base_url = 'http://' + cluster
         else:
             print("")
