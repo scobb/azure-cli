@@ -20,8 +20,6 @@ from datetime import datetime, timedelta
 from cryptography.hazmat.primitives import serialization as crypto_serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.backends import default_backend as crypto_default_backend
-
-
 import select
 
 try:
@@ -323,8 +321,6 @@ class CommandLineInterfaceContext(object):
 
 
 def handler(chan, host, port):
-    import socket
-    import select
     sock = socket.socket()
 
     try:
@@ -337,9 +333,7 @@ def handler(chan, host, port):
                    chan.getpeername(), (host, port)))
 
     while True:
-
         r, w, x = select.select([sock, chan], [], [])
-
         if sock in r:
             data = sock.recv(1024)
             if len(data) == 0:
@@ -347,13 +341,10 @@ def handler(chan, host, port):
             chan.send(data)
             if chan in r:
                 data = chan.recv(1024)
-
                 if len(data) == 0:
-
                     break
 
                 sock.send(data)
-
                 chan.close()
 
         sock.close()
