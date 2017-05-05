@@ -27,7 +27,6 @@ from pkg_resources import resource_filename
 from pkg_resources import resource_string
 import requests
 import tabulate
-import docker
 
 from azure.storage.blob import (BlockBlobService, ContentSettings, BlobPermissions)
 
@@ -37,6 +36,7 @@ from .._util import is_int
 from .._util import ice_connection_timeout
 
 from ._docker_utils import check_docker_credentials
+from ._docker_utils import get_docker_client
 
 from ._realtimeutilities import RealtimeConstants
 from ._realtimeutilities import resolve_marathon_base_url
@@ -56,53 +56,24 @@ from ...ml import __version__
 
 def realtime_service_delete_local(service_name, verbose):
     """Delete a locally published realtime web service."""
-
-    try:
-        dockerps_output = subprocess.check_output(
-            ["docker", "ps", "--filter", "label=amlid={}"
-             .format(service_name)]).decode('ascii').rstrip().split("\n")[1:]
-    except subprocess.CalledProcessError:
-        print('[Local mode] Error retrieving running containers. Please ensure you have permissions to run docker.')
-        return
-
-    if dockerps_output is None or len(dockerps_output) == 0:
+    client = get_docker_client()
+    containers = client.containers.list(filters={'label': 'amlid={}'.format(service_name)})
+    if not containers:
         print("[Local mode] Error: no service named {} running locally.".format(service_name))
         print("[Local mode] To delete a cluster based service, switch to remote mode first: az ml env remote")
         return
-
-    if len(dockerps_output) != 1:
+    if len(containers) != 1:
         print("[Local mode] Error: ambiguous reference - too many containers ({}) with the same label.".format(
-            len(dockerps_output)))
+            len(containers)))
         return
-
-    container_id = dockerps_output[0][0:12]
+    container = containers[0]
+    container_id = container.attrs['Id'][0:12]
     if verbose:
         print("Killing docker container id {}".format(container_id))
-
-    try:
-        di_config = subprocess.check_output(
-            ["docker", "inspect", "--format='{{json .Config}}'", container_id]).decode('ascii')
-        subprocess.check_call(["docker", "kill", container_id])
-        subprocess.check_call(["docker", "rm", container_id])
-    except subprocess.CalledProcessError:
-        print('[Local mode] Error deleting service. Please ensure you have permissions to run docker.')
-        return
-
-    try:
-        config = json.loads(di_config)
-    except ValueError:
-        print('[Local mode] Error removing docker image. Please ensure you have permissions to run docker.')
-        return
-
-    if 'Image' in config:
-        if verbose:
-            print('[Debug] Removing docker image {}'.format(config['Image']))
-        try:
-            subprocess.check_call(["docker", "rmi", "{}".format(config['Image'])])
-        except subprocess.CalledProcessError:
-            print('[Local mode] Error removing docker image. Please ensure you have permissions to run docker.')
-            return
-
+    image_name = container.attrs['Config']['Image']
+    container.kill()
+    container.remove()
+    client.images.remove(image_name, force=True)
     print("Service deleted.")
     return
 
@@ -937,10 +908,8 @@ def _realtime_service_list(service_name=None, verb=False, context=cli_context):
         else:
             filters = {'label': 'amlid'}
 
-        client = docker.DockerClient()
-        # specify version 1.24 for now, as that's what runs on centOS DSVM
-        client.api = docker.APIClient(base_url='unix://var/run/docker.sock',
-                                      version='1.24')
+        client = get_docker_client()
+
         app_table = [
                         ['NAME', 'IMAGE', 'CPU', 'MEMORY', 'STATUS', 'INSTANCES',
                          'HEALTH']

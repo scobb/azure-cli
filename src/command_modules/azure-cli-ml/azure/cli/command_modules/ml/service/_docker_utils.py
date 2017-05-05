@@ -13,6 +13,7 @@ Utilities to work with docker.
 import base64
 import json
 import os
+import docker
 
 
 def check_docker_credentials(acr_home, acr_user, acr_pw, verbose):
@@ -75,3 +76,11 @@ def add_docker_credentials(acr_home, acr_user, acr_pw, verbose):
         print(json.dumps(docker_config))
     with open(os.path.expanduser('~/.docker/config.json'), 'w+') as dockerconfig_file:
         dockerconfig_file.write(json.dumps(docker_config))
+
+
+def get_docker_client():
+    client = docker.DockerClient()
+    # specify version 1.24 for now, as that's what runs on centOS DSVM
+    client.api = docker.APIClient(base_url='unix://var/run/docker.sock',
+                                  version='1.24')
+    return client
