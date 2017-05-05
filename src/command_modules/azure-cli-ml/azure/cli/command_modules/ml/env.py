@@ -112,7 +112,7 @@ def env_cluster(verb, context=CommandLineInterfaceContext()):
                 return
     else:
         basename = context.az_account_name[:-4]
-        ssh_key_path = os.path.join(os.path.expanduser('~'), '.ssh', 'acs_id_rsa')
+        ssh_key_path = context.get_acs_ssh_private_key_path()
         if not os.path.exists(ssh_key_path):
             print('Unable to find ssh key {}. If you did not provision this Kubernetes '
                   'environment from this machine, you may need to copy the key from '
@@ -224,13 +224,15 @@ def env_setup(status, name, kubernetes, local_only, service_principal_app_id,
                             sshconf.write('Host {}\n'.format(acs_master))
                             sshconf.write('    HostName {}\n'.format(acs_master))
                             sshconf.write('    User acsadmin\n')
-                            sshconf.write('    IdentityFile ~/.ssh/acs_id_rsa\n')
+                            sshconf.write('    IdentityFile {}\n'.format(
+                                context.get_acs_ssh_private_key_path()))
                         os.chmod(ssh_config_fp, 0o600)
                     except:
                         print('Failed to update ~/.ssh/config. '
                               'You will need to manually update your '
-                              '.ssh/config to look for ~/.ssh/acs_id_rsa '
-                              'for host {}'.format(acs_master))
+                              '.ssh/config to look for {} '
+                              'for host {}'.format(context.get_acs_ssh_private_key_path(),
+                                                   acs_master))
 
                     print("To switch to cluster mode, run 'az ml env cluster'.")
             except AzureCliError as exc:
@@ -239,7 +241,7 @@ def env_setup(status, name, kubernetes, local_only, service_principal_app_id,
         return
 
     try:
-        ssh_private_key_path, ssh_public_key = create_ssh_key_if_not_exists()
+        ssh_private_key_path, ssh_public_key = create_ssh_key_if_not_exists(context)
     except AzureCliError:
         return
 

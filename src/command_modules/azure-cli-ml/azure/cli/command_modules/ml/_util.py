@@ -23,8 +23,6 @@ from cryptography.hazmat.backends import default_backend as crypto_default_backe
 import select
 
 
-import select
-
 try:
     # python 3
     from urllib.request import pathname2url
@@ -86,6 +84,14 @@ class CommandLineInterfaceContext(object):
         self.hdi_domain = self.hdi_home.split('.')[0] if self.hdi_home else None
         self.forwarded_port = None
 
+    @staticmethod
+    def get_acs_ssh_private_key_path():
+        """
+
+        :return: str filepath to ssh private key
+        """
+        return os.path.join(os.path.expanduser('~'), '.ssh', 'acs_id_rsa')
+
     def set_up_mesos_port_forwarding(self):
         """
 
@@ -95,7 +101,7 @@ class CommandLineInterfaceContext(object):
         acs_username = 'acsadmin'
         remote_port = 2200
         client = paramiko.SSHClient()
-        acs_key_fp = os.path.join(os.path.expanduser('~'), '.ssh', 'acs_id_rsa')
+        acs_key_fp = self.get_acs_ssh_private_key_path()
         client.load_host_keys(acs_key_fp)
 
         # base class is silent
@@ -907,10 +913,10 @@ def is_int(int_str):
         return False
 
 
-def create_ssh_key_if_not_exists():
+def create_ssh_key_if_not_exists(context):
     from ._az_util import AzureCliError
     ssh_dir = os.path.join(os.path.expanduser('~'), '.ssh')
-    private_key_path = os.path.join(ssh_dir, 'acs_id_rsa')
+    private_key_path = context.get_acs_ssh_private_key_path()
     public_key_path = '{}.pub'.format(private_key_path)
     if not os.path.exists(private_key_path):
         if not os.path.exists(ssh_dir):
