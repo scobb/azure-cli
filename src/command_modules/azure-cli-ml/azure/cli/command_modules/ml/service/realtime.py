@@ -788,7 +788,7 @@ def realtime_service_deploy(context, image, app_id, app_insights_enabled, verbos
         m_app = m_app.json()
 
     print("Success.")
-    print("Usage: az ml service run realtime -n " + app_id + " [-d '{\"input\" : \"!! YOUR DATA HERE !!\"}']")
+    print("Usage: az ml service run realtime -n " + app_id + " [-d '{\"input\":\"!! YOUR DATA HERE !!\"}']")
 
 
 def realtime_service_deploy_k8s(context, image, app_id, app_insights_enabled, num_replicas, verbose=False):
@@ -828,7 +828,7 @@ def realtime_service_deploy_k8s(context, image, app_id, app_insights_enabled, nu
         k8s_ops.create_service(k8s_service_template_path, app_id, 'realtime', verbose)
 
         print("Success.")
-        print("Usage: az ml service run realtime -n " + app_id + " [-d '{\"input\" : \"!! YOUR DATA HERE !!\"}']")
+        print("Usage: az ml service run realtime -n " + app_id + " [-d '{\"input\":\"!! YOUR DATA HERE !!\"}']")
     except ApiException as exc:
         print("An exception occurred while deploying the service. {}".format(exc))
     finally:

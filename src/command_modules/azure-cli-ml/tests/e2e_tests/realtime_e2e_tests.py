@@ -5,9 +5,11 @@ from mocks import E2eContext
 from azure.cli.command_modules.ml.service.realtime import realtime_service_list
 from azure.cli.command_modules.ml.service.realtime import realtime_service_view
 from azure.cli.command_modules.ml.service.realtime import realtime_service_create
+from azure.cli.command_modules.ml.service.realtime import realtime_service_run
+from azure.cli.command_modules.ml.service.realtime import realtime_service_delete
 
-
-path_to_score_file = os.path.join(os.path.split(os.path.abspath(__file__))[0], '..', 'test_resources', 'basic_app.py')
+path_to_score_file = os.path.join(os.path.split(os.path.abspath(__file__))[0], '..',
+                                  'test_resources', 'basic_app.py')
 
 
 def create_basic_service(context, name):
@@ -31,8 +33,9 @@ class UserScenario(object):
         self.verify = unittest.TestCase("__init__")
 
     def get_test_name(self):
-        return 'test_{}_{}'.format(self.__class__.__name__.lower().replace('scenario', ''),
-                                   self.context.name)
+        return 'test_{}_{}'.format(
+            self.__class__.__name__.lower().replace('scenario', ''),
+            self.context.name)
 
     def test_scenario(self):
         raise NotImplementedError
@@ -58,20 +61,25 @@ class ViewScenario(UserScenario):
         self.verify.assertTrue(lines[0].startswith('+--------+'))
         self.verify.assertTrue(lines[1].startswith('| NAME   |'))
         self.verify.assertTrue(lines[2].startswith('|--------+'))
-        self.verify.assertTrue(lines[3].startswith('| basic  | {}/basic'.format(self.context.acr_home)))
+        self.verify.assertTrue(lines[3].startswith('| basic  |'))
         self.verify.assertTrue(lines[4].startswith('+--------+'))
         self.verify.assertEqual(lines[5], 'Usage:')
-        self.verify.assertTrue(lines[6].startswith('  az ml  : az ml service run realtime -n basic '))
-        self.verify.assertTrue(lines[7].startswith('  curl : curl -X POST -H "Content-Type:application/json"'))
+        self.verify.assertTrue(
+            lines[6].startswith('  az ml  : az ml service run realtime -n basic '))
+        self.verify.assertTrue(lines[7].startswith(
+            '  curl : curl -X POST -H "Content-Type:application/json"'))
 
 
 class ViewNonExistentScenario(UserScenario):
     def test_scenario(self):
-        realtime_service_view('nonexistent_service', context=self.context)
+        realtime_service_view('nonexistentservice', context=self.context)
         if not hasattr(sys.stdout, "getvalue"):
             self.verify.fail("need to run in buffered mode")
         output = sys.stdout.getvalue().strip()
-        self.verify.assertEqual(output, 'No service running with name nonexistent_service on your ACS cluster')
+        self.verify.assertTrue(
+            output == 'No service running with name nonexistentservice on your ACS cluster'
+            or
+            'No such service nonexistentservice' in output)
 
 
 class CreateScenario(UserScenario):
@@ -80,10 +88,18 @@ class CreateScenario(UserScenario):
         if not hasattr(sys.stdout, "getvalue"):
             self.verify.fail("need to run in buffered mode")
         output = sys.stdout.getvalue().strip()
-        lines = output.split('\n')
-        self.verify.assertEqual(lines[-2], 'Success.')
-        self.verify.assertEqual(lines[-1], 'Usage: az ml service run realtime -n test '
-                                           '[-d \'{"input" : "!! YOUR DATA HERE !!"}\']')
+        self.verify.assertTrue('Success.' in output)
+        self.verify.assertTrue('Usage: az ml service run realtime -n test [-d \'{"input":"!! YOUR DATA HERE !!"}\']' in output)
+
+
+class RunExistingScenario(UserScenario):
+    def test_scenario(self):
+        realtime_service_run(service_name='basic',
+                             input_data='{"input":"something to echo"}',
+                             verb=False,
+                             context=self.context)
+        output = sys.stdout.getvalue().strip()
+        self.verify.assertEqual(output, 'Echo: something to echo')
 
 
 class TestManager(unittest.TestCase):
@@ -93,13 +109,14 @@ class TestManager(unittest.TestCase):
 
     @classmethod
     def tearDownClass(cls):
-        pass
+        realtime_service_delete('test', False, local_context)
 
     def setUp(self):
         pass
 
     def tearDown(self):
         pass
+
 
 local_context = E2eContext('local')
 local_context.local_mode = True
@@ -142,12 +159,15 @@ scenarios = [
     ViewScenario,
     ViewNonExistentScenario,
     CreateScenario,
+    RunExistingScenario,
 ]
-
-
 
 if __name__ == '__main__':
     assert not hasattr(sys.stdout, "getvalue")
+    # TODO - parse arguments for input environments (-k, -m)
+    # TODO - read environments from encrypted environment vars
+    # TODO - ensure proper acs_id_rsa exists where we are running the test
+    # TODO - ensure proper kubectl where we are running the test
     for context in contexts:
         for scenario in scenarios:
             test = scenario(context)
