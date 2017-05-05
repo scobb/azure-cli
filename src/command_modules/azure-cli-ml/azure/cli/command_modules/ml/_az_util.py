@@ -88,11 +88,14 @@ def validate_env_name(name):
             'Name must only contain lowercase alphanumeric characters.')
 
 
-def az_login():
+def az_login(app_id=None, client_secret=None, tenant=None):
     """Log in to Azure if not already logged in
     :return None
     """
     profile = Profile()
+    if app_id and client_secret and tenant:
+        profile.find_subscriptions_on_login(False, app_id, client_secret, True, tenant)
+        return
 
     # interactive login
     try:
