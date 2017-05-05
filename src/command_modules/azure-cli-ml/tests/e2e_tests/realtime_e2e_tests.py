@@ -1,6 +1,7 @@
 import unittest
 import sys
 import os
+import tempfile
 from mocks import E2eContext
 from azure.cli.command_modules.ml.service.realtime import realtime_service_list
 from azure.cli.command_modules.ml.service.realtime import realtime_service_view
@@ -136,6 +137,10 @@ class TestManager(unittest.TestCase):
     def tearDown(self):
         pass
 
+
+E2eContext.ssh_private_key_path = tempfile.mkstemp()
+with open(E2eContext.ssh_private_key_path, 'w') as keyfile:
+    keyfile.write(os.environ['aml_test_ssh_key'])
 
 local_context = E2eContext('local')
 local_context.local_mode = True
