@@ -28,6 +28,7 @@ DEPENDENCIES = [
     'azure-mgmt-resource>=0.30.2',
     'azure-mgmt-storage>=1.0.0rc1',
     'azure-storage>=0.33',
+    'docker>=2.2.1',
     'future',
     'kubernetes>=1.0.0',
     'paramiko',

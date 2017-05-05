@@ -27,6 +27,7 @@ from pkg_resources import resource_filename
 from pkg_resources import resource_string
 import requests
 import tabulate
+import docker
 
 from azure.storage.blob import (BlockBlobService, ContentSettings, BlobPermissions)
 
@@ -932,69 +933,32 @@ def _realtime_service_list(service_name=None, verb=False, context=cli_context):
 
     if context.in_local_mode():
         if service_name is not None:
-            filter_expr = "label=amlid={}".format(service_name)
+            filters = {'label': 'amlid={}'.format(service_name)}
         else:
-            filter_expr = "label=amlid"
+            filters = {'label': 'amlid'}
 
-        try:
-            dockerps_output = subprocess.check_output(
-                ["docker", "ps", "--filter", filter_expr]).decode('ascii').rstrip().split("\n")[1:]
-        except subprocess.CalledProcessError:
-            print('[Local mode] Error retrieving running containers. Please ensure you have permissions to run docker.')
-            return
-        if dockerps_output is not None:
-            app_table = [['NAME', 'IMAGE', 'CPU', 'MEMORY', 'STATUS', 'INSTANCES', 'HEALTH']]
-            for container in dockerps_output:
-                container_id = container[0:12]
-                try:
-                    di_config = subprocess.check_output(
-                        ["docker", "inspect", "--format='{{json .Config}}'", container_id]).decode('ascii')
-                    di_state = subprocess.check_output(
-                        ["docker", "inspect", "--format='{{json .State}}'", container_id]).decode('ascii')
-                except subprocess.CalledProcessError:
-                    print('[Local mode] Error inspecting docker container. Please ensure you have permissions to run docker.') #pylint: disable=line-too-long
-                    if verbose:
-                        print('[Debug] Container id: {}'.format(container_id))
-                    return
-                try:
-                    config = json.loads(di_config)
-                    state = json.loads(di_state)
-                except ValueError:
-                    print('[Local mode] Error retrieving container details. Skipping...')
-                    return
+        client = docker.DockerClient()
+        # specify version 1.24 for now, as that's what runs on centOS DSVM
+        client.api = docker.APIClient(base_url='unix://var/run/docker.sock',
+                                      version='1.24')
+        app_table = [
+                        ['NAME', 'IMAGE', 'CPU', 'MEMORY', 'STATUS', 'INSTANCES',
+                         'HEALTH']
+                    ] + [[
+                             container.attrs['Config']['Labels']['amlid'],
+                             container.attrs['Config'][
+                                 'Image'] if 'Image' in container.attrs else 'Unknown',
+                             'N/A',  # CPU
+                             'N/A',  # Memory
+                             container.attrs['State']['Status'],
+                             1,  # Instances
+                             'N/A',  # health
+                         ] for container in client.containers.list(filters=filters)
+                         ]
 
-                # Name of the app
-                if 'Labels' in config and 'amlid' in config['Labels']:
-                    app_entry = [config['Labels']['amlid']]
-                else:
-                    app_entry = ['Unknown']
+        print(tabulate.tabulate(app_table, headers='firstrow', tablefmt='psql'))
 
-                # Image from the registry
-                if 'Image' in config:
-                    app_entry.append(config['Image'])
-                else:
-                    app_entry.append('Unknown')
-
-                # CPU and Memory are currently not reported for local containers
-                app_entry.append('N/A')
-                app_entry.append('N/A')
-
-                # Status
-                if 'Status' in state:
-                    app_entry.append(state['Status'])
-                else:
-                    app_entry.append('Unknown')
-
-                # Instances is always 1 for local containers
-                app_entry.append(1)
-
-                # Health is currently not reported for local containers
-                app_entry.append('N/A')
-                app_table.append(app_entry)
-            print(tabulate.tabulate(app_table, headers='firstrow', tablefmt='psql'))
-
-            return len(app_table) - 1
-
+        return len(app_table) - 1
     # Cluster mode
     if context.env_is_k8s:
         return realtime_service_list_kubernetes(context, service_name, verbose)
