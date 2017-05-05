@@ -1,8 +1,28 @@
 import unittest
 import sys
+import os
 from mocks import E2eContext
 from azure.cli.command_modules.ml.service.realtime import realtime_service_list
 from azure.cli.command_modules.ml.service.realtime import realtime_service_view
+from azure.cli.command_modules.ml.service.realtime import realtime_service_create
+
+
+path_to_score_file = os.path.join(os.path.split(os.path.abspath(__file__))[0], '..', 'test_resources', 'basic_app.py')
+
+
+def create_basic_service(context, name):
+    realtime_service_create(score_file=path_to_score_file,
+                            dependencies=[],
+                            requirements=[],
+                            schema_file='',
+                            service_name=name,
+                            verb=False,
+                            custom_ice_url='',
+                            target_runtime='spark-py',
+                            app_insights_logging_enabled=False,
+                            model='',
+                            num_replicas=1,
+                            context=context)
 
 
 class UserScenario(object):
@@ -38,8 +58,6 @@ class ViewScenario(UserScenario):
         self.verify.assertTrue(lines[0].startswith('+--------+'))
         self.verify.assertTrue(lines[1].startswith('| NAME   |'))
         self.verify.assertTrue(lines[2].startswith('|--------+'))
-        print(lines[3])
-        print('| basic  | {}/basic'.format(self.context.acr_home))
         self.verify.assertTrue(lines[3].startswith('| basic  | {}/basic'.format(self.context.acr_home)))
         self.verify.assertTrue(lines[4].startswith('+--------+'))
         self.verify.assertEqual(lines[5], 'Usage:')
@@ -54,6 +72,18 @@ class ViewNonExistentScenario(UserScenario):
             self.verify.fail("need to run in buffered mode")
         output = sys.stdout.getvalue().strip()
         self.verify.assertEqual(output, 'No service running with name nonexistent_service on your ACS cluster')
+
+
+class CreateScenario(UserScenario):
+    def test_scenario(self):
+        create_basic_service(self.context, 'test')
+        if not hasattr(sys.stdout, "getvalue"):
+            self.verify.fail("need to run in buffered mode")
+        output = sys.stdout.getvalue().strip()
+        lines = output.split('\n')
+        self.verify.assertEqual(lines[-2], 'Success.')
+        self.verify.assertEqual(lines[-1], 'Usage: az ml service run realtime -n test '
+                                           '[-d \'{"input" : "!! YOUR DATA HERE !!"}\']')
 
 
 class TestManager(unittest.TestCase):
@@ -110,7 +140,8 @@ contexts = [
 scenarios = [
     ListScenario,
     ViewScenario,
-    ViewNonExistentScenario
+    ViewNonExistentScenario,
+    CreateScenario,
 ]
 
 
